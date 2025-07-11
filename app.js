@@ -8,7 +8,6 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 // Importações locais
@@ -17,27 +16,6 @@ const { testConnection, syncDatabase } = require('./src/models');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-
-/**
- * Configuração de CORS
- */
-app.use(cors()); // Libera CORS para todas as rotas e origens
-
-
-/**
- * Configuração de Rate Limiting
- */
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutos
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // máximo 100 requests por IP
-  message: {
-    success: false,
-    message: 'Muitas requisições. Tente novamente em alguns minutos.',
-    retryAfter: Math.ceil((parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000) / 1000)
-  },
-  standardHeaders: true,
-  legacyHeaders: false
-});
 
 /**
  * Middlewares de segurança
@@ -57,8 +35,7 @@ app.use(helmet({
 /**
  * Middlewares gerais
  */
-app.use(cors(corsOptions));
-app.use(limiter);
+app.use(cors()); // ✅ CORS liberado para todas as origens e rotas
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -111,7 +88,6 @@ app.use('*', (req, res) => {
 app.use((error, req, res, next) => {
   console.error('❌ Erro não tratado:', error);
   
-  // Não expor detalhes do erro em produção
   const isDevelopment = process.env.NODE_ENV === 'development';
   
   res.status(error.status || 500).json({
@@ -177,4 +153,3 @@ if (require.main === module) {
 }
 
 module.exports = app;
-
