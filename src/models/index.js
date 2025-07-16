@@ -37,13 +37,14 @@ SmsMessage.belongsTo(User, {
 });
 
 // SmsService -> SmsMessage (1:N)
+// CORREÇÃO: Usar 'sms_service_id' como foreignKey, consistente com SmsMessage.js
 SmsService.hasMany(SmsMessage, {
-  foreignKey: 'service_id',
+  foreignKey: 'sms_service_id', // Alterado de 'service_id' para 'sms_service_id'
   as: 'messages'
 });
 
 SmsMessage.belongsTo(SmsService, {
-  foreignKey: 'service_id',
+  foreignKey: 'sms_service_id', // Alterado de 'service_id' para 'sms_service_id'
   as: 'service'
 });
 
@@ -59,15 +60,17 @@ ActiveNumber.belongsTo(User, {
 });
 
 // SmsService -> ActiveNumber (1:N)
+// CORREÇÃO: Usar 'sms_service_id' como foreignKey, consistente com ActiveNumber.js
 SmsService.hasMany(ActiveNumber, {
-  foreignKey: 'service_id',
+  foreignKey: 'sms_service_id', // Alterado de 'service_id' para 'sms_service_id'
   as: 'active_numbers'
 });
 
 ActiveNumber.belongsTo(SmsService, {
-  foreignKey: 'service_id',
-  as: 'service'
+  foreignKey: 'sms_service_id', // Alterado de 'service_id' para 'sms_service_id'
+  as: 'smsService' // Renomeado para 'smsService' para consistência, ActiveNumber.js já usa 'smsService' na inclusão
 });
+
 
 /**
  * Função para testar a conexão com o banco de dados
@@ -106,4 +109,3 @@ module.exports = {
   testConnection,
   syncDatabase
 };
-

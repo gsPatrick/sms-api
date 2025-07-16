@@ -4,59 +4,27 @@
  * Gerencia as requisições HTTP relacionadas aos pagamentos
  */
 
+const PaymentsService = require('./Payments.service'); // Importar o serviço
+
 class PaymentsController {
   /**
    * Lista os pacotes de créditos disponíveis
    */
-  getCreditPackages(req, res) {
+  async getCreditPackages(req, res) { // Tornar assíncrono para chamar o serviço
     try {
-      const packages = [
-        {
-          id: 'basic',
-          name: 'Básico',
-          credits: 10,
-          price: 15.00,
-          description: 'Ideal para uso pessoal',
-          popular: false
-        },
-        {
-          id: 'standard',
-          name: 'Padrão',
-          credits: 50,
-          price: 60.00,
-          description: 'Perfeito para pequenas empresas',
-          popular: true,
-          discount: 20
-        },
-        {
-          id: 'premium',
-          name: 'Premium',
-          credits: 100,
-          price: 100.00,
-          description: 'Para uso profissional intenso',
-          popular: false,
-          discount: 33
-        },
-        {
-          id: 'enterprise',
-          name: 'Empresarial',
-          credits: 500,
-          price: 400.00,
-          description: 'Solução completa para empresas',
-          popular: false,
-          discount: 47
-        }
-      ];
+      // ✅ CORREÇÃO: Chamar o serviço para obter os pacotes
+      const packages = PaymentsService.getCreditPackages(); 
       
-      res.json({
+      res.status(200).json({ // Status 200 OK
         success: true,
-        data: packages
+        data: packages,
+        message: 'Pacotes de créditos obtidos com sucesso' // Adicionar mensagem de sucesso
       });
     } catch (error) {
       console.error('Erro ao obter pacotes de créditos:', error);
       res.status(500).json({
         success: false,
-        message: 'Erro interno do servidor'
+        message: 'Erro interno do servidor ao obter pacotes'
       });
     }
   }
@@ -65,6 +33,7 @@ class PaymentsController {
    * Cria uma sessão de pagamento no Stripe
    */
   createStripePayment(req, res) {
+    // ESTA É UMA SIMULAÇÃO. NO PROJETO REAL, CHAMARIA PaymentsService.createStripePaymentSession
     try {
       const { amount, credits, currency } = req.body;
 
@@ -95,6 +64,7 @@ class PaymentsController {
    * Cria uma preferência de pagamento no Mercado Pago
    */
   createMercadoPagoPayment(req, res) {
+    // ESTA É UMA SIMULAÇÃO. NO PROJETO REAL, CHAMARIA PaymentsService.createMercadoPagoPreference
     try {
       const { amount, credits } = req.body;
 
@@ -124,6 +94,7 @@ class PaymentsController {
    * Lista histórico de transações do usuário
    */
   getUserTransactions(req, res) {
+    // ESTA É UMA SIMULAÇÃO. NO PROJETO REAL, CHAMARIA PaymentsService.getUserTransactions (se houvesse um) ou CreditsService.getTransactionHistory
     try {
       const { page = 1, limit = 10 } = req.query;
 
@@ -173,4 +144,3 @@ class PaymentsController {
 }
 
 module.exports = new PaymentsController();
-

@@ -8,11 +8,12 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-require('dotenv').config();
+require('dotenv').config(); // Garante que as variáveis de ambiente sejam carregadas
 
 // Importações locais
 const routes = require('./src/Routes');
-const { testConnection, syncDatabase } = require('./src/models');
+// Certifique-se de que o caminho para 'models' está correto (assumindo que está em 'src/models/index.js')
+const { testConnection, syncDatabase } = require('./src/models'); 
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -27,15 +28,18 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'"],
       imgSrc: ["'self'", "data:", "https:"],
+      // Adicione o domínio do seu frontend aqui se ele estiver em um domínio diferente para CSP
+      // connectSrc: ["'self'", "https://jackbear-sms.r954jc.easypanel.host"],
     },
   },
-  crossOriginEmbedderPolicy: false
+  crossOriginEmbedderPolicy: false // Necessário para alguns embeds de terceiros, como widgets de pagamento
 }));
 
 /**
  * Middlewares gerais
  */
-app.use(cors()); // ✅ CORS liberado para todas as origens e rotas
+// ✅ CORS liberado para todas as origens e rotas (você pode restringir isso em produção)
+app.use(cors()); 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -67,7 +71,7 @@ app.get('/health', (req, res) => {
 /**
  * Rotas principais da API
  */
-app.use('/api', routes);
+app.use('/api', routes); // Assumindo que 'routes' é o seu Router principal
 
 /**
  * Middleware para rotas não encontradas
@@ -105,27 +109,32 @@ app.use((error, req, res, next) => {
  */
 const startServer = async () => {
   try {
-    // Comentando temporariamente a conexão com o banco
-    // await testConnection();
-    // await syncDatabase(false);
+    // ---- AQUI ESTÁ A MUDANÇA PRINCIPAL: DESCOMENTANDO A CONEXÃO E SINCRONIZAÇÃO ----
+    console.log('Attempting to connect and sync database...');
+    await testConnection(); // Testa a conexão com o banco de dados
     
-    console.log('⚠️  Servidor iniciado sem conexão com banco de dados (modo desenvolvimento)');
+    // Sincroniza os modelos com o banco de dados
+    // Use { force: true } APENAS NA PRIMEIRA VEZ em desenvolvimento para criar as tabelas do zero (apaga dados existentes!).
+    // Em produção ou para manter dados, use { force: false } ou remova o argumento para o padrão (false).
+    await syncDatabase({ force: true }); // <<<<<<< Descomentado e configurado!
+
+    console.log('✅ Servidor conectado ao banco de dados e modelos sincronizados.');
     
     // Inicia o servidor
     app.listen(PORT, () => {
       console.log(`🚀 Servidor rodando na porta ${PORT}`);
       console.log(`📍 URL: http://localhost:${PORT}`);
       console.log(`📋 Health Check: http://localhost:${PORT}/health`);
-      console.log(`📖 API Info: http://localhost:${PORT}/api/info`);
+      // Removi a linha 'API Info' pois não há rota '/api/info' definida no seu routes.js fornecido.
     });
   } catch (error) {
-    console.error('❌ Erro ao inicializar o servidor:', error);
-    process.exit(1);
+    console.error('❌ Erro ao inicializar o servidor ou conectar ao DB:', error);
+    process.exit(1); // Encerra o processo se houver erro na inicialização do DB
   }
 };
 
 /**
- * Tratamento de sinais do sistema
+ * Tratamento de sinais do sistema (importante para encerramento limpo)
  */
 process.on('SIGTERM', () => {
   console.log('🛑 SIGTERM recebido. Encerrando servidor...');
@@ -139,12 +148,18 @@ process.on('SIGINT', () => {
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ Unhandled Rejection:', reason);
-  process.exit(1);
+  // Não encerre o processo imediatamente em desenvolvimento para depuração
+  if (process.env.NODE_ENV !== 'development') {
+    process.exit(1);
+  }
 });
 
 process.on('uncaughtException', (error) => {
   console.error('❌ Uncaught Exception:', error);
-  process.exit(1);
+  // Não encerre o processo imediatamente em desenvolvimento para depuração
+  if (process.env.NODE_ENV !== 'development') {
+    process.exit(1);
+  }
 });
 
 // Inicia o servidor apenas se este arquivo for executado diretamente

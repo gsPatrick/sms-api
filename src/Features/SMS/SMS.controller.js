@@ -6,6 +6,8 @@
  */
 
 const SMSService = require('./SMS.service');
+const { ActiveNumber, SmsMessage, User } = require('../../models'); // Mover importações para o topo
+const { Op } = require('sequelize'); // Mover importação para o topo
 
 class SMSController {
   /**
@@ -165,7 +167,7 @@ class SMSController {
       }
 
       // Busca o número ativo pelo ID da ativação
-      const { ActiveNumber } = require('../../models');
+      // Removido: const { ActiveNumber } = require('../../models'); - Já importado no topo
       const activeNumber = await ActiveNumber.findOne({
         where: { api_activation_id: activation_id }
       });
@@ -203,8 +205,8 @@ class SMSController {
    */
   async getAllSmsHistory(req, res) {
     try {
-      const { SmsMessage, User } = require('../../models');
-      const { Op } = require('sequelize');
+      // Removido: const { SmsMessage, User } = require('../../models'); - Já importado no topo
+      // Removido: const { Op } = require('sequelize'); - Já importado no topo
       
       const {
         page = 1,
@@ -267,4 +269,3 @@ class SMSController {
 }
 
 module.exports = new SMSController();
-
