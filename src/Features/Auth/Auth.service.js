@@ -1,12 +1,13 @@
 /**
  * Serviço de Autenticação
- * 
+ *
  * Contém a lógica de negócio para autenticação de usuários
  * incluindo registro, login e gerenciamento de sessões
  */
 
 const { User } = require('../../models');
 const { generateToken } = require('../../Utils/auth');
+const { Op } = require('sequelize'); // <<<< ESTA LINHA ESTAVA FALTANDO!
 
 class AuthService {
   /**
@@ -20,7 +21,7 @@ class AuthService {
     // Verifica se o usuário já existe
     const existingUser = await User.findOne({
       where: {
-        $or: [
+        [Op.or]: [ // <<<< CORREÇÃO: Usar [Op.or]
           { email },
           { username }
         ]
@@ -142,11 +143,11 @@ class AuthService {
     if (filteredData.username || filteredData.email) {
       const existingUser = await User.findOne({
         where: {
-          $or: [
+          [Op.or]: [ // <<<< CORREÇÃO: Usar [Op.or]
             filteredData.email ? { email: filteredData.email } : null,
             filteredData.username ? { username: filteredData.username } : null
           ].filter(Boolean),
-          id: { $ne: userId }
+          id: { [Op.ne]: userId } // <<<< CORREÇÃO: Usar [Op.ne]
         }
       });
 
@@ -201,4 +202,3 @@ class AuthService {
 }
 
 module.exports = new AuthService();
-
