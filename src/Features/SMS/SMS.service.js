@@ -164,6 +164,60 @@ class SMSService {
     }
   }
 
+   async getSmsUsageStats(userId, period = 'daily', days = 30) {
+    let groupByFormat;
+    let startDate;
+
+    if (period === 'daily') {
+      // Para o PostgreSQL, use TO_CHAR para formatar a data como DD/MM
+      groupByFormat = "TO_CHAR(\"created_at\", 'DD/MM')";
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+    } else if (period === 'monthly') {
+      // Para o PostgreSQL, use TO_CHAR para formatar a data como MM/YYYY
+      groupByFormat = "TO_CHAR(\"created_at\", 'MM/YYYY')";
+      startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - 6); // Últimos 6 meses
+      startDate.setDate(1); // Primeiro dia do mês
+    } else {
+      throw new Error('Período inválido. Use "daily" ou "monthly".');
+    }
+
+    const whereClause = {
+      user_id: userId,
+      created_at: {
+        [Op.gte]: startDate,
+      },
+    };
+
+    const stats = await SmsMessage.findAll({
+      attributes: [
+        // Agrupa por data formatada
+        [literal(groupByFormat), 'date'],
+        [fn('COUNT', col('id')), 'total_sms'],
+        [fn('SUM', literal("CASE WHEN status = 'received' THEN 1 ELSE 0 END")), 'delivered_sms'],
+        [fn('SUM', literal("CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END")), 'failed_sms'], // Assumindo 'cancelled' como falha
+      ],
+      where: whereClause,
+      group: [literal(groupByFormat)],
+      order: [literal(groupByFormat)], // Ordena pela data formatada
+      raw: true, // Retorna dados puros
+    });
+    
+    // A API retornará os dados como string (ex: "date": "16/07")
+    // Você pode precisar de um pré-processamento no frontend ou aqui para garantir ordem.
+    // Para 'daily', garanta que todos os dias do período estejam presentes, mesmo com 0 envios.
+    // Para fins de demonstração, o resultado raw do Sequelize é suficiente.
+    
+    return stats.map(item => ({
+      date: item.date, // Ex: "16/07" ou "07/2025"
+      total_sms: parseInt(item.total_sms),
+      delivered_sms: parseInt(item.delivered_sms),
+      failed_sms: parseInt(item.failed_sms),
+    }));
+  }
+
+
   /**
    * Processa o recebimento de um SMS
    * @param {Object} activeNumber - Número ativo

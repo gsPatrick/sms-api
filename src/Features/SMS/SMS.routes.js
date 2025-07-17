@@ -135,6 +135,36 @@ router.post('/webhook', [
  * @desc    Obtém histórico de SMS de todos os usuários (apenas Admin)
  * @access  Private (Admin only)
  */
+
+router.get('/stats', [
+  authenticate,
+  query('period')
+    .optional()
+    .isIn(['daily', 'monthly'])
+    .withMessage('Período deve ser "daily" ou "monthly"'),
+  query('days')
+    .optional()
+    .isInt({ min: 1, max: 365 })
+    .withMessage('Dias deve ser um número inteiro entre 1 e 365'),
+  handleValidationErrors
+], async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const period = req.query.period || 'daily';
+        const days = parseInt(req.query.days) || 30; // Padrão 30 dias
+
+        // ✅ CORREÇÃO: Chamar o método do SERVIÇO diretamente
+        const stats = await SMSService.getSmsUsageStats(userId, period, days); 
+        res.status(200).json({ success: true, message: 'Estatísticas obtidas com sucesso', data: stats });
+    } catch (error) {
+        res.status(400).json({ success: false, message: error.message });
+    }
+});
+/**
+ * @route   GET /api/sms/all-history
+ * @desc    Obtém histórico de SMS de todos os usuários (apenas Admin)
+ * @access  Private (Admin only)
+ */
 router.get('/all-history', [
   authenticate,
   authorize(['admin']),
