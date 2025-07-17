@@ -117,7 +117,7 @@ class CreditsService {
     const {
       page = 1,
       limit = 20,
-      type, // Pode ser uma string ou um array de strings
+      type, // Agora pode ser string ou array de strings
       status,
       startDate,
       endDate
@@ -131,7 +131,7 @@ class CreditsService {
       if (Array.isArray(type)) {
         where.type = { [Op.in]: type }; // Se for array, usa Op.in
       } else {
-        where.type = type; // Se for string, usa diretamente
+        where.type = type; // Se for uma única string, usa diretamente
       }
     }
 
@@ -173,6 +173,8 @@ class CreditsService {
       }
     };
   }
+
+
 
   /**
    * Obtém estatísticas de créditos do usuário
