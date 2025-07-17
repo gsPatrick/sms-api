@@ -14,9 +14,9 @@ const router = express.Router();
 /**
  * @route GET /api/payments/packages
  * @desc Lista pacotes de créditos disponíveis
- * @access Public
+ * @access Private (mas acessível a clientes logados)
  */
-router.get('/packages', PaymentsController.getCreditPackages);
+router.get('/packages', authenticate, PaymentsController.getCreditPackages);
 
 /**
  * @route POST /api/payments/stripe/create
@@ -24,7 +24,7 @@ router.get('/packages', PaymentsController.getCreditPackages);
  * @access Private
  */
 router.post('/stripe/create',
-  authenticate,
+  authenticate, // Autenticação para usuários logados
   [
     body('amount').isFloat({ min: 0.01 }).withMessage('Valor deve ser maior que 0'),
     body('credits').isInt({ min: 1 }).withMessage('Quantidade de créditos deve ser maior que 0'),
@@ -39,7 +39,7 @@ router.post('/stripe/create',
  * @access Private
  */
 router.post('/mercadopago/create',
-  authenticate,
+  authenticate, // Autenticação para usuários logados
   [
     body('amount').isFloat({ min: 0.01 }).withMessage('Valor deve ser maior que 0'),
     body('credits').isInt({ min: 1 }).withMessage('Quantidade de créditos deve ser maior que 0')
@@ -49,17 +49,9 @@ router.post('/mercadopago/create',
 
 /**
  * @route GET /api/payments/transactions
- * @desc Lista transações do usuário
- * @access Private
+ * @desc Esta rota não é usada pelo frontend do SMSBRA para histórico de compras.
+ * @access Private (Pode ser removida ou adaptada se necessário)
  */
-router.get('/transactions',
-  authenticate,
-  [
-    query('page').optional().isInt({ min: 1 }).withMessage('Página deve ser um número maior que 0'),
-    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limite deve ser entre 1 e 100')
-  ],
-  PaymentsController.getUserTransactions
-);
+// REMOVIDO: router.get('/transactions', ...) para evitar confusão ou endpoint não utilizado.
 
 module.exports = router;
-

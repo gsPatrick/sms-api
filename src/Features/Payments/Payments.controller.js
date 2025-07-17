@@ -10,15 +10,14 @@ class PaymentsController {
   /**
    * Lista os pacotes de créditos disponíveis
    */
-  async getCreditPackages(req, res) { // Tornar assíncrono para chamar o serviço
+   async getCreditPackages(req, res) {
     try {
-      // ✅ CORREÇÃO: Chamar o serviço para obter os pacotes
       const packages = PaymentsService.getCreditPackages(); 
       
-      res.status(200).json({ // Status 200 OK
+      res.status(200).json({
         success: true,
         data: packages,
-        message: 'Pacotes de créditos obtidos com sucesso' // Adicionar mensagem de sucesso
+        message: 'Pacotes de créditos obtidos com sucesso'
       });
     } catch (error) {
       console.error('Erro ao obter pacotes de créditos:', error);
@@ -28,34 +27,27 @@ class PaymentsController {
       });
     }
   }
-
   /**
    * Cria uma sessão de pagamento no Stripe
    */
-  createStripePayment(req, res) {
-    // ESTA É UMA SIMULAÇÃO. NO PROJETO REAL, CHAMARIA PaymentsService.createStripePaymentSession
+ async createStripePayment(req, res) { // Tornar async
     try {
       const { amount, credits, currency } = req.body;
+      const userId = req.user.id; // Pegar o ID do usuário autenticado
 
-      // Simulação de resposta do Stripe
-      const session = {
-        session_id: 'cs_test_' + Math.random().toString(36).substr(2, 9),
-        session_url: 'https://checkout.stripe.com/pay/cs_test_' + Math.random().toString(36).substr(2, 9),
-        amount: amount,
-        credits: credits,
-        currency: currency || 'BRL'
-      };
+      // ✅ CHAMADA REAL PARA O SERVIÇO DO STRIPE
+      const session = await PaymentsService.createStripePaymentSession(userId, { amount, credits, currency });
 
-      res.json({
+      res.status(200).json({ // Status 200 OK
         success: true,
         data: session,
-        message: 'Sessão de pagamento criada com sucesso'
+        message: 'Sessão de pagamento Stripe criada com sucesso'
       });
     } catch (error) {
       console.error('Erro ao criar pagamento Stripe:', error);
       res.status(500).json({
         success: false,
-        message: error.message || 'Erro ao processar pagamento'
+        message: error.message || 'Erro ao processar pagamento Stripe'
       });
     }
   }
@@ -63,32 +55,28 @@ class PaymentsController {
   /**
    * Cria uma preferência de pagamento no Mercado Pago
    */
-  createMercadoPagoPayment(req, res) {
-    // ESTA É UMA SIMULAÇÃO. NO PROJETO REAL, CHAMARIA PaymentsService.createMercadoPagoPreference
+ async createMercadoPagoPayment(req, res) { // Tornar async
     try {
       const { amount, credits } = req.body;
+      const userId = req.user.id; // Pegar o ID do usuário autenticado
 
-      // Simulação de resposta do Mercado Pago
-      const preference = {
-        preference_id: 'MP-' + Math.random().toString(36).substr(2, 9),
-        init_point: 'https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=MP-' + Math.random().toString(36).substr(2, 9),
-        amount: amount,
-        credits: credits
-      };
+      // ✅ CHAMADA REAL PARA O SERVIÇO DO MERCADO PAGO
+      const preference = await PaymentsService.createMercadoPagoPreference(userId, { amount, credits });
 
-      res.json({
+      res.status(200).json({ // Status 200 OK
         success: true,
         data: preference,
-        message: 'Preferência de pagamento criada com sucesso'
+        message: 'Preferência de pagamento Mercado Pago criada com sucesso'
       });
     } catch (error) {
       console.error('Erro ao criar pagamento Mercado Pago:', error);
       res.status(500).json({
         success: false,
-        message: error.message || 'Erro ao processar pagamento'
+        message: error.message || 'Erro ao processar pagamento Mercado Pago'
       });
     }
   }
+
 
   /**
    * Lista histórico de transações do usuário
