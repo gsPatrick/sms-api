@@ -8,7 +8,7 @@
 const { SmsMessage, ActiveNumber, SmsService, User } = require('../../models');
 const smsActiveAPI = require('../../Utils/smsActive');
 const CreditsService = require('../Credits/Credits.service');
-const { Op } = require('sequelize');
+const { Op, fn, col, literal } = require('sequelize'); // <<<< CORREÇÃO AQUI! Adicionado fn, col, literal
 
 class SMSService {
   /**
