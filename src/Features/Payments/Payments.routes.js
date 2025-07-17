@@ -1,190 +1,65 @@
 /**
- * Rotas de SMS
+ * Rotas de Pagamentos
  * 
- * Define as rotas HTTP para gerenciamento de SMS
- * incluindo validações e middlewares de segurança
+ * Define as rotas HTTP para funcionalidades de pagamento
  */
 
 const express = require('express');
-const SMSController = require('./SMS.controller'); // ✅ Importa o SMSController
+const { body, param, query } = require('express-validator');
+const PaymentsController = require('./Payments.controller');
 const { authenticate, authorize } = require('../../Utils/auth');
-const {
-  validateSmsRequest,
-  validateUUID,
-  validatePagination,
-  handleValidationErrors
-} = require('../../Utils/validation');
-const { body, query } = require('express-validator');
 
 const router = express.Router();
 
 /**
- * @route   POST /api/sms/request-number
- * @desc    Solicita um número para recebimento de SMS OTP
- * @access  Private
+ * @route GET /api/payments/packages
+ * @desc Lista pacotes de créditos disponíveis
+ * @access Public
  */
-router.post('/request-number', [
+router.get('/packages', PaymentsController.getCreditPackages);
+
+/**
+ * @route POST /api/payments/stripe/create
+ * @desc Cria sessão de pagamento no Stripe
+ * @access Private
+ */
+router.post('/stripe/create',
   authenticate,
-  validateSmsRequest
-], SMSController.requestNumber);
+  [
+    body('amount').isFloat({ min: 0.01 }).withMessage('Valor deve ser maior que 0'),
+    body('credits').isInt({ min: 1 }).withMessage('Quantidade de créditos deve ser maior que 0'),
+    body('currency').optional().isIn(['BRL', 'USD', 'EUR']).withMessage('Moeda inválida')
+  ],
+  PaymentsController.createStripePayment
+);
 
 /**
- * @route   GET /api/sms/status/:activeNumberId
- * @desc    Verifica o status de recebimento de SMS
- * @access  Private
+ * @route POST /api/payments/mercadopago/create
+ * @desc Cria preferência de pagamento no Mercado Pago
+ * @access Private
  */
-router.get('/status/:activeNumberId', [
+router.post('/mercadopago/create',
   authenticate,
-  validateUUID('activeNumberId')
-], SMSController.checkSmsStatus);
+  [
+    body('amount').isFloat({ min: 0.01 }).withMessage('Valor deve ser maior que 0'),
+    body('credits').isInt({ min: 1 }).withMessage('Quantidade de créditos deve ser maior que 0')
+  ],
+  PaymentsController.createMercadoPagoPayment
+);
 
 /**
- * @route   POST /api/sms/reactivate/:activeNumberId
- * @desc    Reativa um número para receber outro SMS
- * @access  Private
+ * @route GET /api/payments/transactions
+ * @desc Lista transações do usuário
+ * @access Private
  */
-router.post('/reactivate/:activeNumberId', [
+router.get('/transactions',
   authenticate,
-  validateUUID('activeNumberId')
-], SMSController.reactivateNumber);
-
-/**
- * @route   POST /api/sms/cancel/:activeNumberId
- * @desc    Cancela um número ativo
- * @access  Private
- */
-router.post('/cancel/:activeNumberId', [
-  authenticate,
-  validateUUID('activeNumberId'),
-  body('reason')
-    .optional()
-    .isLength({ max: 500 })
-    .withMessage('Motivo deve ter no máximo 500 caracteres'),
-  
-  handleValidationErrors
-], SMSController.cancelNumber);
-
-/**
- * @route   GET /api/sms/history
- * @desc    Obtém o histórico de SMS do usuário
- * @access  Private
- */
-router.get('/history', [
-  authenticate,
-  validatePagination,
-  query('status')
-    .optional()
-    .isIn(['sent', 'delivered', 'failed', 'pending', 'received', 'cancelled'])
-    .withMessage('Status deve ser: sent, delivered, failed, pending, received ou cancelled'),
-  
-  query('service_code')
-    .optional()
-    .isLength({ min: 1, max: 20 })
-    .withMessage('Código do serviço deve ter entre 1 e 20 caracteres'),
-  
-  query('start_date')
-    .optional()
-    .isISO8601()
-    .withMessage('Data de início deve estar no formato ISO8601'),
-  
-  query('end_date')
-    .optional()
-    .isISO8601()
-    .withMessage('Data de fim deve estar no formato ISO8601'),
-  
-  handleValidationErrors
-], SMSController.getSmsHistory);
-
-/**
- * @route   GET /api/sms/active-numbers
- * @desc    Obtém os números ativos do usuário
- * @access  Private
- */
-router.get('/active-numbers', authenticate, SMSController.getActiveNumbers);
-
-/**
- * @route   POST /api/sms/webhook
- * @desc    Webhook para recebimento de SMS da API SMS Active
- * @access  Public (mas deve ser validado por IP ou token)
- */
-router.post('/webhook', [
-  body('activation_id')
-    .notEmpty()
-    .withMessage('ID de ativação é obrigatório'),
-  
-  body('status')
-    .optional()
-    .isIn(['completed', 'cancelled', 'waiting'])
-    .withMessage('Status deve ser: completed, cancelled ou waiting'),
-  
-  body('code')
-    .optional()
-    .isLength({ min: 1, max: 20 })
-    .withMessage('Código deve ter entre 1 e 20 caracteres'),
-  
-  body('phone')
-    .optional()
-    .isLength({ min: 1, max: 20 })
-    .withMessage('Telefone deve ter entre 1 e 20 caracteres'),
-  
-  handleValidationErrors
-], SMSController.smsWebhook);
-
-/**
- * @route   GET /api/sms/stats
- * @desc    Obtém estatísticas de uso de SMS para o usuário logado
- * @access  Private
- * ✅ NOVO ENDPOINT NO ROUTES, APONTANDO PARA O CONTROLLER
- */
-router.get('/stats', [
-  authenticate,
-  query('period')
-    .optional()
-    .isIn(['daily', 'monthly'])
-    .withMessage('Período deve ser "daily" ou "monthly"'),
-  query('days')
-    .optional()
-    .isInt({ min: 1, max: 365 })
-    .withMessage('Dias deve ser um número inteiro entre 1 e 365'),
-  handleValidationErrors
-], SMSController.getSmsUsageStats);
-
-
-/**
- * @route   GET /api/sms/all-history
- * @desc    Obtém histórico de SMS de todos os usuários (apenas Admin)
- * @access  Private (Admin only)
- */
-router.get('/all-history', [
-  authenticate,
-  authorize(['admin']),
-  validatePagination,
-  query('status')
-    .optional()
-    .isIn(['sent', 'delivered', 'failed', 'pending', 'received', 'cancelled'])
-    .withMessage('Status deve ser: sent, delivered, failed, pending, received ou cancelled'),
-  
-  query('service_code')
-    .optional()
-    .isLength({ min: 1, max: 20 })
-    .withMessage('Código do serviço deve ter entre 1 e 20 caracteres'),
-  
-  query('user_id')
-    .optional()
-    .isUUID()
-    .withMessage('ID do usuário deve ser um UUID válido'),
-  
-  query('start_date')
-    .optional()
-    .isISO8601()
-    .withMessage('Data de início deve estar no formato ISO8601'),
-  
-  query('end_date')
-    .optional()
-    .isISO8601()
-    .withMessage('Data de fim deve estar no formato ISO8601'),
-  
-  handleValidationErrors
-], SMSController.getAllSmsHistory);
+  [
+    query('page').optional().isInt({ min: 1 }).withMessage('Página deve ser um número maior que 0'),
+    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limite deve ser entre 1 e 100')
+  ],
+  PaymentsController.getUserTransactions
+);
 
 module.exports = router;
+

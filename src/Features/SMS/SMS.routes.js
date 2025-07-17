@@ -6,7 +6,7 @@
  */
 
 const express = require('express');
-const SMSController = require('./SMS.controller');
+const SMSController = require('./'); // ✅ Importa o SMSController
 const { authenticate, authorize } = require('../../Utils/auth');
 const {
   validateSmsRequest,
@@ -131,11 +131,11 @@ router.post('/webhook', [
 ], SMSController.smsWebhook);
 
 /**
- * @route   GET /api/sms/all-history
- * @desc    Obtém histórico de SMS de todos os usuários (apenas Admin)
- * @access  Private (Admin only)
+ * @route   GET /api/sms/stats
+ * @desc    Obtém estatísticas de uso de SMS para o usuário logado
+ * @access  Private
+ * ✅ NOVO ENDPOINT NO ROUTES, APONTANDO PARA O CONTROLLER
  */
-
 router.get('/stats', [
   authenticate,
   query('period')
@@ -147,19 +147,9 @@ router.get('/stats', [
     .isInt({ min: 1, max: 365 })
     .withMessage('Dias deve ser um número inteiro entre 1 e 365'),
   handleValidationErrors
-], async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const period = req.query.period || 'daily';
-        const days = parseInt(req.query.days) || 30; // Padrão 30 dias
+], SMSController.getSmsUsageStats);
 
-        // ✅ CORREÇÃO: Chamar o método do SERVIÇO diretamente
-        const stats = await SMSService.getSmsUsageStats(userId, period, days); 
-        res.status(200).json({ success: true, message: 'Estatísticas obtidas com sucesso', data: stats });
-    } catch (error) {
-        res.status(400).json({ success: false, message: error.message });
-    }
-});
+
 /**
  * @route   GET /api/sms/all-history
  * @desc    Obtém histórico de SMS de todos os usuários (apenas Admin)
@@ -198,4 +188,3 @@ router.get('/all-history', [
 ], SMSController.getAllSmsHistory);
 
 module.exports = router;
-
