@@ -116,7 +116,7 @@ const startServer = async () => {
     // Sincroniza os modelos com o banco de dados
     // Use { force: true } APENAS NA PRIMEIRA VEZ em desenvolvimento para criar as tabelas do zero (apaga dados existentes!).
     // Em produção ou para manter dados, use { force: false } ou remova o argumento para o padrão (false).
-    await syncDatabase({ force: true }); // <<<<<<< Descomentado e configurado!
+    await syncDatabase({ force: false }); // <<<<<<< Descomentado e configurado!
 
     console.log('✅ Servidor conectado ao banco de dados e modelos sincronizados.');
     

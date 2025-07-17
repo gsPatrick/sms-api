@@ -5,9 +5,9 @@
  * e delega a lógica de negócio para o SMSService
  */
 
-const SMSService = require('./SMS.service');
-const { ActiveNumber, SmsMessage, User } = require('../../models'); // Mover importações para o topo
-const { Op } = require('sequelize'); // Mover importação para o topo
+const SMSService = require('./SMS.service'); // ✅ Importa o SMSService
+const { ActiveNumber, SmsMessage, User } = require('../../models');
+const { Op } = require('sequelize');
 
 class SMSController {
   /**
@@ -167,7 +167,6 @@ class SMSController {
       }
 
       // Busca o número ativo pelo ID da ativação
-      // Removido: const { ActiveNumber } = require('../../models'); - Já importado no topo
       const activeNumber = await ActiveNumber.findOne({
         where: { api_activation_id: activation_id }
       });
@@ -200,14 +199,30 @@ class SMSController {
   }
 
   /**
+   * Obtém estatísticas de uso de SMS para o usuário logado
+   * GET /api/sms/stats
+   * ✅ NOVO MÉTODO NO CONTROLLER
+   */
+  async getSmsUsageStats(req, res) {
+    try {
+        const userId = req.user.id;
+        const period = req.query.period || 'daily';
+        const days = parseInt(req.query.days) || 30; // Padrão 30 dias
+
+        // ✅ Chamar o método do SERVIÇO (SMSService)
+        const stats = await SMSService.getSmsUsageStats(userId, period, days); 
+        res.status(200).json({ success: true, message: 'Estatísticas obtidas com sucesso', data: stats });
+    } catch (error) {
+        res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
+  /**
    * Obtém histórico de SMS de todos os usuários (apenas Admin)
    * GET /api/sms/all-history
    */
   async getAllSmsHistory(req, res) {
     try {
-      // Removido: const { SmsMessage, User } = require('../../models'); - Já importado no topo
-      // Removido: const { Op } = require('sequelize'); - Já importado no topo
-      
       const {
         page = 1,
         limit = 20,
