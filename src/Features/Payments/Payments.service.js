@@ -68,7 +68,7 @@ class PaymentsService {
       // =========================================================================================
       // ATENÇÃO: URL E SEGREDO DE WEBHOOK HARDCODED PARA TESTE/DEBUG - NÃO USE EM PRODUÇÃO!
       // =========================================================================================
-      const FRONTEND_URL_HARDCODED = 'http://localhost:3000'; // <<<<< SUBSTITUA PELA URL REAL DO SEU FRONTEND
+      const FRONTEND_URL_HARDCODED = 'https://smsfront-5jvf.vercel.app'; // <<<<< SUBSTITUA PELA URL REAL DO SEU FRONTEND
       const STRIPE_WEBHOOK_SECRET_HARDCODED = 'whsec_e4b1a45778a99252c803f295f13d80b2a7596c0d8d7e9b0c1d2e3f4g5h6i7j8k'; // <<<<< SUBSTITUA PELO SEU SEGREDO DE WEBHOOK DO STRIPE
       // =========================================================================================
 
@@ -157,7 +157,7 @@ class PaymentsService {
       // =========================================================================================
       // ATENÇÃO: URLS HARDCODED PARA TESTE/DEBUG - NÃO USE EM PRODUÇÃO!
       // =========================================================================================
-      const FRONTEND_URL_HARDCODED = 'http://localhost:3000'; // <<<<< SUBSTITUA PELA URL REAL DO SEU FRONTEND
+      const FRONTEND_URL_HARDCODED = 'https://smsfront-5jvf.vercel.app'; // <<<<< SUBSTITUA PELA URL REAL DO SEU FRONTEND
       const BACKEND_URL_HARDCODED = 'https://jackbear-sms.r954jc.easypanel.host'; // <<<<< SUBSTITUA PELA URL REAL DO SEU BACKEND
       // =========================================================================================
 
