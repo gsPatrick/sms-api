@@ -6,7 +6,7 @@
  */
 
 const express = require('express');
-const SMSController = require('./'); // ✅ Importa o SMSController
+const SMSController = require('./SMS.controller'); // ✅ Importa o SMSController
 const { authenticate, authorize } = require('../../Utils/auth');
 const {
   validateSmsRequest,
