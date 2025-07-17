@@ -1,4 +1,3 @@
-// src/Features/Payments/Payments.service.js
 /**
  * Serviço de Pagamentos
  * 
@@ -10,9 +9,9 @@ const Stripe = require('stripe');
 const { MercadoPagoConfig, Payment, Preference } = require('mercadopago');
 const { User, Transaction } = require('../../models');
 const CreditsService = require('../Credits/Credits.service');
+const { Op } = require('sequelize'); // Importar Op para consultas (usado em CreditsService, mas bom ter aqui)
 
 // Helper para formatar datas em ISO com offset para MercadoPago
-// Essa função é importante para o formato de data que o Mercado Pago espera para expiração.
 function formatDateToPreference(date) {
   const pad = (n) => String(n).padStart(2, '0');
   const padMs = (n) => String(n).padStart(3, '0');
@@ -37,15 +36,18 @@ function formatDateToPreference(date) {
 
 class PaymentsService {
   constructor() {
-    // Inicializa Stripe
-    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    // =========================================================================================
+    // ATENÇÃO: CREDENCIAIS HARDCODED PARA TESTE/DEBUG - NÃO USE EM PRODUÇÃO!
+    // SUBSTITUA PELAS SUAS CHAVES REAIS DE TESTE (OU PRODUÇÃO)
+    // =========================================================================================
+    this.stripe = new Stripe('sk_test_51PcwC3RjBvK1HlK73G4t5j5gQ6nQ7w2G3x5x6L7A8b9c0d1e2f3g4h5i6j7k8l9m0n1o2p3q4r5s6t7u8v9w0x1y2z'); // <<<<< SUBSTITUA PELA SUA CHAVE SECRETA DO STRIPE
     
-    // Inicializa Mercado Pago
     this.mercadoPago = new MercadoPagoConfig({
-      accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN,
+      accessToken: 'TEST-543842517815393-052409-2b6e0c6eaa8b7efc9885a56cb8f22377-230029956', // <<<<< SUBSTITUA PELO SEU ACCESS TOKEN DO MERCADO PAGO
     });
     this.mpPayment = new Payment(this.mercadoPago);
     this.mpPreference = new Preference(this.mercadoPago);
+    // =========================================================================================
   }
 
   /**
@@ -63,7 +65,13 @@ class PaymentsService {
         throw new Error('Usuário não encontrado');
       }
 
-      // Cria a sessão de pagamento
+      // =========================================================================================
+      // ATENÇÃO: URL E SEGREDO DE WEBHOOK HARDCODED PARA TESTE/DEBUG - NÃO USE EM PRODUÇÃO!
+      // =========================================================================================
+      const FRONTEND_URL_HARDCODED = 'http://localhost:3000'; // <<<<< SUBSTITUA PELA URL REAL DO SEU FRONTEND
+      const STRIPE_WEBHOOK_SECRET_HARDCODED = 'whsec_e4b1a45778a99252c803f295f13d80b2a7596c0d8d7e9b0c1d2e3f4g5h6i7j8k'; // <<<<< SUBSTITUA PELO SEU SEGREDO DE WEBHOOK DO STRIPE
+      // =========================================================================================
+
       const session = await this.stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         line_items: [
@@ -73,7 +81,7 @@ class PaymentsService {
               product_data: {
                 name: `${credits} Créditos SMS`,
                 description: `Compra de ${credits} créditos para recebimento de SMS`,
-                images: ['https://smsbra.com.br/logo.png'],
+                images: ['https://smsbra.com.br/logo.png'], // Certifique-se de que esta URL é válida e acessível publicamente
               },
               unit_amount: Math.round(amount * 100), // Stripe usa centavos
             },
@@ -81,8 +89,8 @@ class PaymentsService {
           },
         ],
         mode: 'payment',
-        success_url: `${process.env.FRONTEND_URL}/dashboard/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.FRONTEND_URL}/dashboard/payment/cancel`,
+        success_url: `${FRONTEND_URL_HARDCODED}/dashboard/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${FRONTEND_URL_HARDCODED}/dashboard/payment/cancel`,
         metadata: {
           user_id: userId,
           credits: credits.toString(),
@@ -120,6 +128,10 @@ class PaymentsService {
         transaction_id: transaction.id
       };
     } catch (error) {
+      // LOG MELHORADO: Inclui a resposta do erro do Stripe se disponível
+      if (error.response && error.response.data) {
+        console.error('Detalhes do erro COMPLETO do Stripe:', JSON.stringify(error.response.data, null, 2));
+      }
       throw new Error(`Erro ao criar sessão Stripe: ${error.message}`);
     }
   }
@@ -142,43 +154,55 @@ class PaymentsService {
       const now = new Date();
       const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // Expira em 24 horas
 
-      // ✅ CORREÇÃO: Usar um fallback explícito para as URLs se as variáveis de ambiente não estiverem definidas
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'; 
-      const backendUrl = process.env.BACKEND_URL || 'https://jackbear-sms.r954jc.easypanel.host';
+      // =========================================================================================
+      // ATENÇÃO: URLS HARDCODED PARA TESTE/DEBUG - NÃO USE EM PRODUÇÃO!
+      // =========================================================================================
+      const FRONTEND_URL_HARDCODED = 'http://localhost:3000'; // <<<<< SUBSTITUA PELA URL REAL DO SEU FRONTEND
+      const BACKEND_URL_HARDCODED = 'https://jackbear-sms.r954jc.easypanel.host'; // <<<<< SUBSTITUA PELA URL REAL DO SEU BACKEND
+      // =========================================================================================
+
+      // NOVO LOG: Loga as URLs que estão sendo usadas (agora hardcoded)
+      console.log(`Mercado Pago (HARDCODED): FRONTEND_URL usada: ${FRONTEND_URL_HARDCODED}`);
+      console.log(`Mercado Pago (HARDCODED): BACKEND_URL usada: ${BACKEND_URL_HARDCODED}`);
+
+      const preferenceBody = {
+        items: [
+          {
+            title: `${credits} Créditos SMS`,
+            description: `Compra de ${credits} créditos para recebimento de SMS`,
+            quantity: 1,
+            unit_price: parseFloat(amount),
+            currency_id: 'BRL'
+          }
+        ],
+        payer: {
+          email: user.email,
+          name: user.username
+        },
+        back_urls: {
+          success: `${FRONTEND_URL_HARDCODED}/dashboard/payment/success`,
+          failure: `${FRONTEND_URL_HARDCODED}/dashboard/payment/cancel`,
+          pending: `${FRONTEND_URL_HARDCODED}/dashboard/payment/pending`
+        },
+        auto_return: 'approved',
+        external_reference: userId,
+        metadata: {
+          user_id: userId,
+          credits: credits.toString(),
+          gateway: 'mercadopago'
+        },
+        notification_url: `${BACKEND_URL_HARDCODED}/api/payments/mercadopago/webhook`,
+        statement_descriptor: 'SMS BRA',
+        expires: true,
+        expiration_date_from: formatDateToPreference(now),
+        expiration_date_to: formatDateToPreference(expiresAt),
+      };
+
+      // NOVO LOG: Loga o corpo da preferência antes de enviar
+      console.log('Mercado Pago (HARDCODED): Corpo da Preferência enviado:', JSON.stringify(preferenceBody, null, 2));
 
       const preference = await this.mpPreference.create({
-        body: {
-          items: [
-            {
-              title: `${credits} Créditos SMS`,
-              description: `Compra de ${credits} créditos para recebimento de SMS`,
-              quantity: 1,
-              unit_price: parseFloat(amount),
-              currency_id: 'BRL'
-            }
-          ],
-          payer: {
-            email: user.email,
-            name: user.username
-          },
-          back_urls: {
-            success: `${frontendUrl}/dashboard/payment/success`, // Usar frontendUrl
-            failure: `${frontendUrl}/dashboard/payment/cancel`, // Usar frontendUrl
-            pending: `${frontendUrl}/dashboard/payment/pending`  // Usar frontendUrl
-          },
-          auto_return: 'approved',
-          external_reference: userId,
-          metadata: {
-            user_id: userId,
-            credits: credits.toString(),
-            gateway: 'mercadopago'
-          },
-          notification_url: `${backendUrl}/api/payments/mercadopago/webhook`, // Usar backendUrl
-          statement_descriptor: 'SMS BRA',
-          expires: true,
-          expiration_date_from: formatDateToPreference(now),
-          expiration_date_to: formatDateToPreference(expiresAt),
-        }
+        body: preferenceBody
       });
 
       // Cria transação pendente
@@ -203,6 +227,10 @@ class PaymentsService {
         transaction_id: transaction.id
       };
     } catch (error) {
+      // LOG MELHORADO: Inclui a resposta completa do erro da API do Mercado Pago
+      if (error.response && error.response.data) {
+        console.error('Detalhes do erro COMPLETO do Mercado Pago:', JSON.stringify(error.response.data, null, 2));
+      }
       throw new Error(`Erro ao criar preferência Mercado Pago: ${error.message}`);
     }
   }
@@ -215,11 +243,17 @@ class PaymentsService {
    */
   async processStripeWebhook(event, signature) {
     try {
+      // =========================================================================================
+      // ATENÇÃO: SEGREDO DE WEBHOOK HARDCODED PARA TESTE/DEBUG - NÃO USE EM PRODUÇÃO!
+      // =========================================================================================
+      const STRIPE_WEBHOOK_SECRET_HARDCODED = 'whsec_e4b1a45778a99252c803f295f13d80b2a7596c0d8d7e9b0c1d2e3f4g5h6i7j8k'; // <<<<< SUBSTITUA PELO SEGREDO DE WEBHOOK REAL DO STRIPE
+      // =========================================================================================
+
       // Verifica a assinatura do webhook
       const webhookEvent = this.stripe.webhooks.constructEvent(
         event,
         signature,
-        process.env.STRIPE_WEBHOOK_SECRET
+        STRIPE_WEBHOOK_SECRET_HARDCODED
       );
 
       switch (webhookEvent.type) {
@@ -326,9 +360,6 @@ class PaymentsService {
         where: {
           user_id: user_id,
           gateway: 'stripe',
-          // Precisamos de um identificador mais robusto aqui se a transaction_id_gateway
-          // for apenas o session.id, e a paymentIntent.id for diferente.
-          // Para este caso, podemos tentar achar uma transação pendente para o user_id.
           status: 'pending'
         }
       });
@@ -362,7 +393,7 @@ class PaymentsService {
 
       const transaction = await Transaction.findOne({
         where: {
-          transaction_id_gateway: payment.preference_id, // Usamos o preference_id aqui para encontrar a transação
+          transaction_id_gateway: payment.preference_id,
           gateway: 'mercadopago',
           status: 'pending'
         }
@@ -380,7 +411,7 @@ class PaymentsService {
 
         await CreditsService.addCredits(user_id, parseFloat(credits), {
           gateway: 'mercadopago',
-          transaction_id_gateway: payment.id.toString(), // Usar o ID do pagamento real do MP
+          transaction_id_gateway: payment.id.toString(),
           status: 'completed',
           description: `Compra de ${credits} créditos via Mercado Pago - Pagamento aprovado`,
         });
