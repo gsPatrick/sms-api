@@ -1,3 +1,4 @@
+// src/Features/Payments/Payments.service.js
 /**
  * Serviço de Pagamentos
  * 
@@ -8,7 +9,31 @@
 const Stripe = require('stripe');
 const { MercadoPagoConfig, Payment, Preference } = require('mercadopago');
 const { User, Transaction } = require('../../models');
-// const CreditsService = require('../Credits/Credits.service');
+const CreditsService = require('../Credits/Credits.service');
+
+// Helper para formatar datas em ISO com offset para MercadoPago
+// Essa função é importante para o formato de data que o Mercado Pago espera para expiração.
+function formatDateToPreference(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  const padMs = (n) => String(n).padStart(3, '0');
+  
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  const seconds = pad(date.getSeconds());
+  const ms = padMs(date.getMilliseconds());
+  
+  const offset = -date.getTimezoneOffset(); // Offset em minutos
+  const offsetHours = Math.floor(Math.abs(offset) / 60);
+  const offsetMinutes = Math.abs(offset) % 60;
+  const offsetSign = offset >= 0 ? '+' : '-'; // Mercado Pago usa + para UTC-X, - para UTC+X
+  const offsetFormatted = `${offsetSign}${pad(offsetHours)}:${pad(offsetMinutes)}`;
+  
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}${offsetFormatted}`;
+}
+
 
 class PaymentsService {
   constructor() {
@@ -114,6 +139,9 @@ class PaymentsService {
         throw new Error('Usuário não encontrado');
       }
 
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // Expira em 24 horas
+
       // Cria a preferência de pagamento
       const preference = await this.mpPreference.create({
         body: {
@@ -136,14 +164,18 @@ class PaymentsService {
             pending: `${process.env.FRONTEND_URL}/dashboard/payment/pending`
           },
           auto_return: 'approved',
-          external_reference: userId,
+          external_reference: userId, // Usado para identificar o usuário no webhook
           metadata: {
             user_id: userId,
             credits: credits.toString(),
             gateway: 'mercadopago'
           },
           notification_url: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/payments/mercadopago/webhook`,
-          statement_descriptor: 'SMS BRA'
+          statement_descriptor: 'SMS BRA',
+          // ✅ NOVO: Adicionado expiração da preferência
+          expires: true,
+          expiration_date_from: formatDateToPreference(now),
+          expiration_date_to: formatDateToPreference(expiresAt),
         }
       });
 
@@ -246,11 +278,11 @@ class PaymentsService {
     try {
       const { user_id, credits } = session.metadata;
 
-      // Atualiza a transação
       const transaction = await Transaction.findOne({
         where: {
           transaction_id_gateway: session.id,
-          gateway: 'stripe'
+          gateway: 'stripe',
+          status: 'pending'
         }
       });
 
@@ -264,15 +296,16 @@ class PaymentsService {
           }
         });
 
-        // Adiciona créditos ao usuário
-        // await CreditsService.addCredits(user_id, parseFloat(credits), {
-        //   gateway: 'stripe',
-        //   transaction_id_gateway: session.id,
-        //   status: 'completed',
-        //   description: `Compra de ${credits} créditos via Stripe - Pagamento aprovado`
-        // });
+        await CreditsService.addCredits(user_id, parseFloat(credits), {
+          gateway: 'stripe',
+          transaction_id_gateway: session.id,
+          status: 'completed',
+          description: `Compra de ${credits} créditos via Stripe - Pagamento aprovado`,
+        });
 
-        console.log(`Pagamento Stripe aprovado para usuário ${user_id}: ${credits} créditos`);
+        console.log(`Pagamento Stripe aprovado para usuário ${user_id}: ${credits} créditos. Transação ${transaction.id} marcada como completa.`);
+      } else {
+        console.warn(`Transação Stripe para sessão ${session.id} não encontrada ou já processada.`);
       }
     } catch (error) {
       console.error('Erro ao processar pagamento Stripe aprovado:', error);
@@ -287,11 +320,13 @@ class PaymentsService {
     try {
       const { user_id } = paymentIntent.metadata;
 
-      // Atualiza a transação
       const transaction = await Transaction.findOne({
         where: {
           user_id: user_id,
           gateway: 'stripe',
+          // Precisamos de um identificador mais robusto aqui se a transaction_id_gateway
+          // for apenas o session.id, e a paymentIntent.id for diferente.
+          // Para este caso, podemos tentar achar uma transação pendente para o user_id.
           status: 'pending'
         }
       });
@@ -301,11 +336,14 @@ class PaymentsService {
           status: 'failed',
           metadata: {
             ...transaction.metadata,
-            failure_reason: paymentIntent.last_payment_error?.message
+            failure_reason: paymentIntent.last_payment_error?.message,
+            payment_intent_id: paymentIntent.id
           }
         });
 
-        console.log(`Pagamento Stripe falhado para usuário ${user_id}`);
+        console.log(`Pagamento Stripe falhado para usuário ${user_id}. Transação ${transaction.id} marcada como falha.`);
+      } else {
+        console.warn(`Transação Stripe pendente para usuário ${user_id} não encontrada para marcar como falha.`);
       }
     } catch (error) {
       console.error('Erro ao processar pagamento Stripe falhado:', error);
@@ -320,10 +358,9 @@ class PaymentsService {
     try {
       const { user_id, credits } = payment.metadata;
 
-      // Atualiza a transação
       const transaction = await Transaction.findOne({
         where: {
-          user_id: user_id,
+          transaction_id_gateway: payment.preference_id, // Usamos o preference_id aqui para encontrar a transação
           gateway: 'mercadopago',
           status: 'pending'
         }
@@ -339,15 +376,16 @@ class PaymentsService {
           }
         });
 
-        // Adiciona créditos ao usuário
-        // await CreditsService.addCredits(user_id, parseFloat(credits), {
-        //   gateway: 'mercadopago',
-        //   transaction_id_gateway: payment.id.toString(),
-        //   status: 'completed',
-        //   description: `Compra de ${credits} créditos via Mercado Pago - Pagamento aprovado`
-        // });
+        await CreditsService.addCredits(user_id, parseFloat(credits), {
+          gateway: 'mercadopago',
+          transaction_id_gateway: payment.id.toString(), // Usar o ID do pagamento real do MP
+          status: 'completed',
+          description: `Compra de ${credits} créditos via Mercado Pago - Pagamento aprovado`,
+        });
 
-        console.log(`Pagamento Mercado Pago aprovado para usuário ${user_id}: ${credits} créditos`);
+        console.log(`Pagamento Mercado Pago aprovado para usuário ${user_id}: ${credits} créditos. Transação ${transaction.id} marcada como completa.`);
+      } else {
+        console.warn(`Transação Mercado Pago para preferência ${payment.preference_id} não encontrada ou já processada.`);
       }
     } catch (error) {
       console.error('Erro ao processar pagamento Mercado Pago aprovado:', error);
@@ -362,10 +400,9 @@ class PaymentsService {
     try {
       const { user_id } = payment.metadata;
 
-      // Atualiza a transação
       const transaction = await Transaction.findOne({
         where: {
-          user_id: user_id,
+          transaction_id_gateway: payment.preference_id,
           gateway: 'mercadopago',
           status: 'pending'
         }
@@ -381,7 +418,9 @@ class PaymentsService {
           }
         });
 
-        console.log(`Pagamento Mercado Pago falhado para usuário ${user_id}`);
+        console.log(`Pagamento Mercado Pago falhado para usuário ${user_id}. Transação ${transaction.id} marcada como falha.`);
+      } else {
+        console.warn(`Transação Mercado Pago pendente para preferência ${payment.preference_id} não encontrada para marcar como falha.`);
       }
     } catch (error) {
       console.error('Erro ao processar pagamento Mercado Pago falhado:', error);
@@ -421,7 +460,7 @@ class PaymentsService {
         id: 'basic',
         name: 'Básico',
         credits: 10,
-        price: 5.00,
+        price: 15.00,
         description: 'Ideal para uso pessoal',
         popular: false
       },
@@ -429,8 +468,8 @@ class PaymentsService {
         id: 'standard',
         name: 'Padrão',
         credits: 50,
-        price: 20.00,
-        description: 'Melhor custo-benefício',
+        price: 60.00,
+        description: 'Perfeito para pequenas empresas',
         popular: true,
         discount: 20
       },
@@ -438,23 +477,22 @@ class PaymentsService {
         id: 'premium',
         name: 'Premium',
         credits: 100,
-        price: 35.00,
-        description: 'Para uso intensivo',
+        price: 100.00,
+        description: 'Para uso profissional intenso',
         popular: false,
-        discount: 30
+        discount: 33
       },
       {
         id: 'enterprise',
         name: 'Empresarial',
         credits: 500,
-        price: 150.00,
-        description: 'Para empresas',
+        price: 400.00,
+        description: 'Solução completa para empresas',
         popular: false,
-        discount: 40
+        discount: 47
       }
     ];
   }
 }
 
 module.exports = new PaymentsService();
-
