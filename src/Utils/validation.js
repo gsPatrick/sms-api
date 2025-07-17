@@ -162,19 +162,23 @@ const validateTransactionHistory = [
     .optional()
     .custom((value, { req }) => {
       const allowedTypes = ['credit_purchase', 'sms_sent', 'sms_received', 'refund'];
-      // Se for um array (e.g., ?type=a&type=b)
+      
+      // Se 'value' é um array (ex: ?type=A&type=B), verifica cada item no array
       if (Array.isArray(value)) {
         if (!value.every(type => allowedTypes.includes(type))) {
           throw new Error('Um ou mais tipos de transação são inválidos.');
         }
-      } else { // Se for uma única string (e.g., ?type=a)
+      } else { // Se 'value' é uma única string (ex: ?type=A ou ?type=A,B)
+        // Se a string contiver vírgulas, ela ainda é tratada como uma única string aqui.
+        // O frontend deveria estar enviando ?type=A&type=B ou ?type=A, NÃO ?type=A,B.
+        // Se ainda está chegando "credit_purchase,refund", o frontend não está usando URLSearchParams.append('type', 'value') corretamente.
         if (!allowedTypes.includes(value)) {
           throw new Error('Tipo de transação inválido.');
         }
       }
       return true;
     })
-    .withMessage('Tipo de transação inválido.'), // Mensagem genérica, pois o custom já detalha
+    .withMessage('Tipo de transação inválido. Valores permitidos: ' + ['credit_purchase', 'sms_sent', 'sms_received', 'refund'].join(', ')),
 
   query('status')
     .optional()
@@ -191,9 +195,8 @@ const validateTransactionHistory = [
     .isISO8601()
     .withMessage('Data de fim deve estar no formato ISO8601'),
   
-  handleValidationErrors // Garante que erros de validação sejam tratados
+  handleValidationErrors
 ];
-
 
 module.exports = {
   handleValidationErrors,
