@@ -18,32 +18,24 @@ const { body, query } = require('express-validator');
 
 const router = express.Router();
 
-// Middleware para garantir que apenas admins acessem essas rotas
+// Middleware para garantir que o usuário esteja autenticado em todas as rotas abaixo
 router.use(authenticate);
 
-
-router.get('/services', [
-  validatePagination,
-  query('active')
-    .optional()
-    .isBoolean()
-    .withMessage('active deve ser um valor booleano'),
-  
-  query('category')
-    .optional()
-    .isLength({ min: 1, max: 50 })
-    .withMessage('Categoria deve ter entre 1 e 50 caracteres'),
-  
-  query('search')
-    .optional()
-    .isLength({ min: 1, max: 100 })
-    .withMessage('Busca deve ter entre 1 e 100 caracteres'),
-  
-  handleValidationErrors
-], AdminController.getAllSmsServices);
+/**
+ * @route   GET /api/admin/services/available
+ * @desc    Obtém serviços SMS disponíveis (para usuários)
+ * @access  Private (Qualquer usuário autenticado)
+ * ✅ CORREÇÃO: Esta rota foi movida para ANTES do `authorize(['admin'])`
+ */
+router.get('/services/available', [
+  // Nenhuma validação de role específica é necessária aqui, apenas autenticação
+], AdminController.getAvailableServices);
 
 
+// Middleware para garantir que APENAS ADMINS acessem as ROTAS ABAIXO
+// Todas as rotas daqui para baixo exigirão a role 'admin'
 router.use(authorize(['admin']));
+
 
 /**
  * @route   GET /api/admin/users
@@ -131,6 +123,25 @@ router.delete('/users/:userId', [
  * @desc    Obtém lista de todos os serviços SMS
  * @access  Private (Admin only)
  */
+router.get('/services', [
+  validatePagination,
+  query('active')
+    .optional()
+    .isBoolean()
+    .withMessage('active deve ser um valor booleano'),
+  
+  query('category')
+    .optional()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('Categoria deve ter entre 1 e 50 caracteres'),
+  
+  query('search')
+    .optional()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Busca deve ter entre 1 e 100 caracteres'),
+  
+  handleValidationErrors
+], AdminController.getAllSmsServices);
 
 /**
  * @route   POST /api/admin/services
@@ -215,25 +226,4 @@ router.delete('/services/:serviceId', [
  */
 router.get('/stats', AdminController.getSystemStats);
 
-/**
- * Rotas públicas para usuários (não requerem permissão de admin)
- */
-
-/**
- * @route   GET /api/admin/services/available
- * @desc    Obtém serviços SMS disponíveis (para usuários)
- * @access  Private
- */
-router.get('/services/available', [
-  // Remove a verificação de admin para esta rota específica
-  (req, res, next) => {
-    // Apenas verifica se está autenticado, não se é admin
-    next();
-  }
-], AdminController.getAvailableServices);
-
-
-
-
 module.exports = router;
-
