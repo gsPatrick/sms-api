@@ -142,7 +142,10 @@ class PaymentsService {
       const now = new Date();
       const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // Expira em 24 horas
 
-      // Cria a preferência de pagamento
+      // ✅ CORREÇÃO: Usar um fallback explícito para as URLs se as variáveis de ambiente não estiverem definidas
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'; 
+      const backendUrl = process.env.BACKEND_URL || 'https://jackbear-sms.r954jc.easypanel.host';
+
       const preference = await this.mpPreference.create({
         body: {
           items: [
@@ -159,20 +162,19 @@ class PaymentsService {
             name: user.username
           },
           back_urls: {
-            success: `${process.env.FRONTEND_URL}/dashboard/payment/success`,
-            failure: `${process.env.FRONTEND_URL}/dashboard/payment/cancel`,
-            pending: `${process.env.FRONTEND_URL}/dashboard/payment/pending`
+            success: `${frontendUrl}/dashboard/payment/success`, // Usar frontendUrl
+            failure: `${frontendUrl}/dashboard/payment/cancel`, // Usar frontendUrl
+            pending: `${frontendUrl}/dashboard/payment/pending`  // Usar frontendUrl
           },
           auto_return: 'approved',
-          external_reference: userId, // Usado para identificar o usuário no webhook
+          external_reference: userId,
           metadata: {
             user_id: userId,
             credits: credits.toString(),
             gateway: 'mercadopago'
           },
-          notification_url: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/payments/mercadopago/webhook`,
+          notification_url: `${backendUrl}/api/payments/mercadopago/webhook`, // Usar backendUrl
           statement_descriptor: 'SMS BRA',
-          // ✅ NOVO: Adicionado expiração da preferência
           expires: true,
           expiration_date_from: formatDateToPreference(now),
           expiration_date_to: formatDateToPreference(expiresAt),
