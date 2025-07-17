@@ -154,6 +154,47 @@ const validateSmsServiceCreation = [
   handleValidationErrors
 ];
 
+/**
+ * Validações para histórico de transações (incluindo suporte a array para 'type')
+ */
+const validateTransactionHistory = [
+  query('type')
+    .optional()
+    .custom((value, { req }) => {
+      const allowedTypes = ['credit_purchase', 'sms_sent', 'sms_received', 'refund'];
+      // Se for um array (e.g., ?type=a&type=b)
+      if (Array.isArray(value)) {
+        if (!value.every(type => allowedTypes.includes(type))) {
+          throw new Error('Um ou mais tipos de transação são inválidos.');
+        }
+      } else { // Se for uma única string (e.g., ?type=a)
+        if (!allowedTypes.includes(value)) {
+          throw new Error('Tipo de transação inválido.');
+        }
+      }
+      return true;
+    })
+    .withMessage('Tipo de transação inválido.'), // Mensagem genérica, pois o custom já detalha
+
+  query('status')
+    .optional()
+    .isIn(['pending', 'completed', 'failed', 'cancelled'])
+    .withMessage('Status deve ser: pending, completed, failed ou cancelled'),
+  
+  query('start_date')
+    .optional()
+    .isISO8601()
+    .withMessage('Data de início deve estar no formato ISO8601'),
+  
+  query('end_date')
+    .optional()
+    .isISO8601()
+    .withMessage('Data de fim deve estar no formato ISO8601'),
+  
+  handleValidationErrors // Garante que erros de validação sejam tratados
+];
+
+
 module.exports = {
   handleValidationErrors,
   validateUserRegistration,
@@ -162,6 +203,6 @@ module.exports = {
   validateSmsRequest,
   validateUUID,
   validatePagination,
-  validateSmsServiceCreation
+  validateSmsServiceCreation,
+  validateTransactionHistory // Exportando a nova validação
 };
-

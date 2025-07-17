@@ -228,6 +228,8 @@ class SmsActiveAPI {
 
     return await this.makeRequest(params);
   }
+
+  
 }
 
 module.exports = new SmsActiveAPI();

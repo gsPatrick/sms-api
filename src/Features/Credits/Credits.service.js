@@ -6,7 +6,7 @@
  */
 
 const { User, Transaction } = require('../../models');
-const { Op } = require('sequelize');
+const { Op } = require('sequelize'); // Importação do operador Op
 
 class CreditsService {
   /**
@@ -48,7 +48,7 @@ class CreditsService {
     // Cria a transação
     const transaction = await Transaction.create({
       user_id: userId,
-      type: 'credit_purchase',
+      type: 'credit_purchase', // Ou 'refund', dependendo do contexto da chamada
       amount: parseFloat(amount),
       gateway: transactionData.gateway || 'Internal',
       transaction_id_gateway: transactionData.transaction_id_gateway,
@@ -58,7 +58,9 @@ class CreditsService {
     });
 
     // Adiciona os créditos ao usuário se a transação foi completada
-    if (transaction.status === 'completed') {
+    // Se a transação é de crédito_purchase ou refund e foi completada, o saldo do usuário é atualizado.
+    // Isso garante que o saldo seja atualizado apenas uma vez, após a confirmação do pagamento.
+    if (transaction.status === 'completed' && (transaction.type === 'credit_purchase' || transaction.type === 'refund')) {
       await user.addCredits(amount);
     }
 
@@ -94,7 +96,7 @@ class CreditsService {
     // Cria a transação
     const transaction = await Transaction.create({
       user_id: userId,
-      type: transactionData.type || 'sms_sent',
+      type: transactionData.type || 'sms_sent', // 'sms_sent' ou 'sms_received'
       amount: parseFloat(amount),
       gateway: 'Internal',
       status: 'completed',
@@ -115,7 +117,7 @@ class CreditsService {
     const {
       page = 1,
       limit = 20,
-      type,
+      type, // Pode ser uma string ou um array de strings
       status,
       startDate,
       endDate
@@ -124,9 +126,13 @@ class CreditsService {
     const offset = (page - 1) * limit;
     const where = { user_id: userId };
 
-    // Filtros opcionais
+    // Lógica para lidar com 'type' sendo um array ou string
     if (type) {
-      where.type = type;
+      if (Array.isArray(type)) {
+        where.type = { [Op.in]: type }; // Se for array, usa Op.in
+      } else {
+        where.type = type; // Se for string, usa diretamente
+      }
     }
 
     if (status) {
@@ -235,14 +241,12 @@ class CreditsService {
       throw new Error('Usuário não encontrado');
     }
 
-    // Adiciona os créditos de volta
-    await user.addCredits(amount);
+    // ✅ CORREÇÃO: A chamada para user.addCredits já está no addCredits, para não duplicar
+    // await user.addCredits(amount); 
 
-    // Cria a transação de reembolso
-    const transaction = await Transaction.create({
-      user_id: userId,
+    // Cria a transação de reembolso, que por sua vez, adiciona os créditos
+    const transaction = await this.addCredits(userId, amount, {
       type: 'refund',
-      amount: parseFloat(amount),
       gateway: 'Internal',
       status: 'completed',
       description: reason,
@@ -254,4 +258,3 @@ class CreditsService {
 }
 
 module.exports = new CreditsService();
-

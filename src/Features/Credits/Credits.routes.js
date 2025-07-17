@@ -11,7 +11,8 @@ const { authenticate, authorize } = require('../../Utils/auth');
 const {
   validatePagination,
   validateUUID,
-  handleValidationErrors
+  handleValidationErrors,
+  validateTransactionHistory // Importa a nova validação
 } = require('../../Utils/validation');
 const { body, query } = require('express-validator');
 
@@ -55,28 +56,9 @@ router.post('/add', [
  */
 router.get('/history', [
   authenticate,
-  validatePagination,
-  query('type')
-    .optional()
-    .isIn(['credit_purchase', 'sms_sent', 'sms_received', 'refund'])
-    .withMessage('Tipo deve ser: credit_purchase, sms_sent, sms_received ou refund'),
-  
-  query('status')
-    .optional()
-    .isIn(['pending', 'completed', 'failed', 'cancelled'])
-    .withMessage('Status deve ser: pending, completed, failed ou cancelled'),
-  
-  query('start_date')
-    .optional()
-    .isISO8601()
-    .withMessage('Data de início deve estar no formato ISO8601'),
-  
-  query('end_date')
-    .optional()
-    .isISO8601()
-    .withMessage('Data de fim deve estar no formato ISO8601'),
-  
-  handleValidationErrors
+  validatePagination, // Para 'page' e 'limit'
+  ...validateTransactionHistory, // Para 'type', 'status', 'start_date', 'end_date'
+  handleValidationErrors // Garante que erros de validação sejam tratados
 ], CreditsController.getTransactionHistory);
 
 /**
@@ -118,34 +100,13 @@ router.post('/refund', [
 router.get('/all-transactions', [
   authenticate,
   authorize(['admin']),
-  validatePagination,
-  query('type')
-    .optional()
-    .isIn(['credit_purchase', 'sms_sent', 'sms_received', 'refund'])
-    .withMessage('Tipo deve ser: credit_purchase, sms_sent, sms_received ou refund'),
-  
-  query('status')
-    .optional()
-    .isIn(['pending', 'completed', 'failed', 'cancelled'])
-    .withMessage('Status deve ser: pending, completed, failed ou cancelled'),
-  
-  query('user_id')
+  validatePagination, // Para 'page' e 'limit'
+  ...validateTransactionHistory, // Para 'type', 'status', 'start_date', 'end_date'
+  query('user_id') // Adicionado user_id aqui, pois não faz parte do validateTransactionHistory genérico
     .optional()
     .isUUID()
     .withMessage('ID do usuário deve ser um UUID válido'),
-  
-  query('start_date')
-    .optional()
-    .isISO8601()
-    .withMessage('Data de início deve estar no formato ISO8601'),
-  
-  query('end_date')
-    .optional()
-    .isISO8601()
-    .withMessage('Data de fim deve estar no formato ISO8601'),
-  
   handleValidationErrors
 ], CreditsController.getAllTransactions);
 
 module.exports = router;
-
