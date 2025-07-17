@@ -20,6 +20,29 @@ const router = express.Router();
 
 // Middleware para garantir que apenas admins acessem essas rotas
 router.use(authenticate);
+
+
+router.get('/services', [
+  validatePagination,
+  query('active')
+    .optional()
+    .isBoolean()
+    .withMessage('active deve ser um valor booleano'),
+  
+  query('category')
+    .optional()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('Categoria deve ter entre 1 e 50 caracteres'),
+  
+  query('search')
+    .optional()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Busca deve ter entre 1 e 100 caracteres'),
+  
+  handleValidationErrors
+], AdminController.getAllSmsServices);
+
+
 router.use(authorize(['admin']));
 
 /**
@@ -108,25 +131,6 @@ router.delete('/users/:userId', [
  * @desc    Obtém lista de todos os serviços SMS
  * @access  Private (Admin only)
  */
-router.get('/services', [
-  validatePagination,
-  query('active')
-    .optional()
-    .isBoolean()
-    .withMessage('active deve ser um valor booleano'),
-  
-  query('category')
-    .optional()
-    .isLength({ min: 1, max: 50 })
-    .withMessage('Categoria deve ter entre 1 e 50 caracteres'),
-  
-  query('search')
-    .optional()
-    .isLength({ min: 1, max: 100 })
-    .withMessage('Busca deve ter entre 1 e 100 caracteres'),
-  
-  handleValidationErrors
-], AdminController.getAllSmsServices);
 
 /**
  * @route   POST /api/admin/services
@@ -227,6 +231,9 @@ router.get('/services/available', [
     next();
   }
 ], AdminController.getAvailableServices);
+
+
+
 
 module.exports = router;
 
