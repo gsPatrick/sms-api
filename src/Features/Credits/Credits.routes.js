@@ -12,7 +12,7 @@ const {
   validatePagination,
   validateUUID,
   handleValidationErrors,
-  validateTransactionHistory // Importa a nova validação
+  validateTransactionHistory
 } = require('../../Utils/validation');
 const { body, query } = require('express-validator');
 
@@ -24,6 +24,25 @@ const router = express.Router();
  * @access  Private
  */
 router.get('/balance', authenticate, CreditsController.getBalance);
+
+// =========================================================================
+// ✅ NOVO ENDPOINT PÚBLICO PARA TESTES
+// AVISO: REMOVER ANTES DE IR PARA PRODUÇÃO!
+// =========================================================================
+/**
+ * @route   POST /api/credits/add-balance-for-self (TESTE)
+ * @desc    Adiciona créditos à própria conta do usuário (APENAS PARA TESTES).
+ * @access  Private (Qualquer usuário autenticado)
+ */
+router.post('/add-balance-for-self', [
+  authenticate, // Autentica para saber QUEM é o usuário
+  body('amount')
+    .isFloat({ min: 0.01 })
+    .withMessage('O valor deve ser um número positivo maior que 0.01'),
+  handleValidationErrors
+], CreditsController.addBalanceForSelf);
+// =========================================================================
+
 
 /**
  * @route   POST /api/credits/add
@@ -56,9 +75,9 @@ router.post('/add', [
  */
 router.get('/history', [
   authenticate,
-  validatePagination, // Para 'page' e 'limit'
-  ...validateTransactionHistory, // Para 'type', 'status', 'start_date', 'end_date'
-  handleValidationErrors // Garante que erros de validação sejam tratados
+  validatePagination,
+  ...validateTransactionHistory,
+  handleValidationErrors
 ], CreditsController.getTransactionHistory);
 
 /**
@@ -100,9 +119,9 @@ router.post('/refund', [
 router.get('/all-transactions', [
   authenticate,
   authorize(['admin']),
-  validatePagination, // Para 'page' e 'limit'
-  ...validateTransactionHistory, // Para 'type', 'status', 'start_date', 'end_date'
-  query('user_id') // Adicionado user_id aqui, pois não faz parte do validateTransactionHistory genérico
+  validatePagination,
+  ...validateTransactionHistory,
+  query('user_id')
     .optional()
     .isUUID()
     .withMessage('ID do usuário deve ser um UUID válido'),

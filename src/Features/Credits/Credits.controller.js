@@ -29,6 +29,37 @@ class CreditsController {
     }
   }
 
+   // =========================================================================
+  // ✅ NOVO MÉTODO NO CONTROLLER PARA O ENDPOINT DE TESTE
+  // =========================================================================
+  /**
+   * Adiciona créditos à própria conta do usuário (APENAS PARA TESTES).
+   * POST /api/credits/add-balance-for-self
+   */
+  async addBalanceForSelf(req, res) {
+    try {
+      const { amount } = req.body;
+      const userId = req.user.id; // Pega o ID do próprio usuário a partir do token
+
+      const transaction = await CreditsService.addCredits(userId, amount, {
+        description: `Crédito de teste adicionado pelo próprio usuário`,
+        gateway: 'Internal-Test',
+        metadata: { added_by_self_test_endpoint: true }
+      });
+      
+      res.status(200).json({
+        success: true,
+        message: 'Créditos de teste adicionados com sucesso à sua conta',
+        data: transaction
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+
   /**
    * Adiciona créditos ao usuário (apenas Admin)
    * POST /api/credits/add
