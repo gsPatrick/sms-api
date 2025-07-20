@@ -109,25 +109,20 @@ app.use((error, req, res, next) => {
  */
 const startServer = async () => {
   try {
-    // ---- AQUI ESTÁ A MUDANÇA PRINCIPAL: DESCOMENTANDO A CONEXÃO E SINCRONIZAÇÃO ----
-    console.log('Attempting to connect and sync database...');
-    await testConnection(); // Testa a conexão com o banco de dados
-    
-    // Sincroniza os modelos com o banco de dados
-    // Use { force: true } APENAS NA PRIMEIRA VEZ em desenvolvimento para criar as tabelas do zero (apaga dados existentes!).
-    // Em produção ou para manter dados, use { force: false } ou remova o argumento para o padrão (false).
-    console.log('✅ Servidor conectado ao banco de dados e modelos sincronizados.');
-    
-    // Inicia o servidor
+    console.log('🔌 Testando conexão com banco de dados...');
+    await testConnection();
+
+    console.log('🧨 Sincronizando banco de dados com force: true...');
+    await syncDatabase(true); // <-- aqui força a recriação das tabelas
+
+    console.log('🚀 Iniciando servidor...');
     app.listen(PORT, () => {
-      console.log(`🚀 Servidor rodando na porta ${PORT}`);
-      console.log(`📍 URL: http://localhost:${PORT}`);
-      console.log(`📋 Health Check: http://localhost:${PORT}/health`);
-      // Removi a linha 'API Info' pois não há rota '/api/info' definida no seu routes.js fornecido.
+      console.log(`✅ Servidor rodando em http://localhost:${PORT}`);
+      console.log(`🩺 Health Check: http://localhost:${PORT}/health`);
     });
   } catch (error) {
-    console.error('❌ Erro ao inicializar o servidor ou conectar ao DB:', error);
-    process.exit(1); // Encerra o processo se houver erro na inicialização do DB
+    console.error('❌ Falha ao iniciar o servidor:', error);
+    process.exit(1);
   }
 };
 
