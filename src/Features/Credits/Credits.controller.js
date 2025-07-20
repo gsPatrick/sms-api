@@ -231,6 +231,46 @@ class CreditsController {
       });
     }
   }
+
+ // =========================================================================
+  // ✅ NOVOS MÉTODOS DO CONTROLLER PARA O FLUXO SERVIÇO -> PAÍS
+  // =========================================================================
+  
+  /**
+   * Obtém a lista de todos os serviços disponíveis.
+   * GET /api/sms/get-all-services
+   */
+  async getAllServices(req, res) {
+    try {
+      const services = await SMSService.getAllAvailableServices();
+      res.status(200).json({
+        success: true,
+        message: 'Serviços obtidos com sucesso.',
+        data: services
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  /**
+   * Obtém os países e preços para um serviço específico.
+   * GET /api/sms/countries-by-service/:serviceCode
+   */
+  async getCountriesByService(req, res) {
+    try {
+      const { serviceCode } = req.params;
+      const countries = await SMSService.getCountriesByService(serviceCode);
+      res.status(200).json({
+        success: true,
+        message: `Países para o serviço ${serviceCode} obtidos com sucesso.`,
+        data: countries
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
 }
 
 module.exports = new CreditsController();

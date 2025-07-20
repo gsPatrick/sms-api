@@ -128,4 +128,39 @@ router.get('/all-transactions', [
   handleValidationErrors
 ], CreditsController.getAllTransactions);
 
+
+
+// =========================================================================
+// ✅ NOVAS ROTAS PARA A LÓGICA DE SERVIÇO -> PAÍS
+// =========================================================================
+
+/**
+ * @route   GET /api/sms/get-all-services
+ * @desc    Obtém a lista de todos os serviços disponíveis.
+ * @access  Private
+ */
+router.get('/get-all-services', 
+    authenticate, 
+    SMSController.getAllServices
+);
+
+/**
+ * @route   GET /api/sms/countries-by-service/:serviceCode
+ * @desc    Obtém a lista de países e preços para um serviço específico.
+ * @access  Private
+ */
+router.get('/countries-by-service/:serviceCode',
+  [
+    authenticate,
+    param('serviceCode')
+      .notEmpty()
+      .withMessage('O código do serviço é obrigatório na URL.')
+      .isString()
+      .withMessage('O código do serviço deve ser um texto.'),
+    handleValidationErrors
+  ],
+  SMSController.getCountriesByService
+);
+
+
 module.exports = router;

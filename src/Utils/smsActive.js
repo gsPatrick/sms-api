@@ -141,6 +141,32 @@ class SmsActiveAPI {
   async cancelActivation(id) { return this.setStatus(id, 8); }
   async requestAnotherSms(id) { return this.setStatus(id, 3); }
   async completeActivation(id) { return this.setStatus(id, 6); }
+
+    /**
+   * ✅ NOVA FUNÇÃO: Obtém a lista completa de serviços.
+   * A API V1 retorna um array de objetos.
+   * @returns {Promise<Array>} - Array de objetos de serviço.
+   */
+  async getServicesList() {
+    const response = await this.makeRequest({ action: 'getServicesList' });
+    if (response && response.status === 'success' && Array.isArray(response.services)) {
+      return response.services;
+    }
+    throw new Error('Não foi possível obter a lista de serviços da API.');
+  }
+
+  /**
+   * ✅ NOVA FUNÇÃO: Obtém os preços para um SERVIÇO específico.
+   * @param {string} service - Código do serviço.
+   * @returns {Promise<Object>} - Objeto de preços para o serviço.
+   */
+  async getPricesForService(service) {
+    return this.makeRequest({ action: 'getPrices', service });
+  }
 }
+
+
+
+
 
 module.exports = new SmsActiveAPI();
