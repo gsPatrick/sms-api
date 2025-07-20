@@ -47,4 +47,4 @@ class SettingsController {
   }
 }
 
-module.exports = new SettingsController();s
+module.exports = new SettingsController();
