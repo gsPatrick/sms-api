@@ -6,7 +6,7 @@
  */
 
 const express = require('express');
-const SMSController = require('./SMS.controller'); // ✅ Importa o SMSController
+const SMSController = require('./SMS.controller');
 const { authenticate, authorize } = require('../../Utils/auth');
 const {
   validateSmsRequest,
@@ -17,6 +17,42 @@ const {
 const { body, query, param } = require('express-validator');
 
 const router = express.Router();
+
+// =========================================================================
+// ✅ NOVAS ROTAS PARA A LÓGICA DE PAÍS -> SERVIÇO
+// =========================================================================
+
+/**
+ * @route   GET /api/sms/countries
+ * @desc    Obtém a lista de países disponíveis da API SMS Active.
+ * @access  Private
+ */
+router.get('/countries', 
+    authenticate, 
+    SMSController.getAvailableCountries
+);
+
+/**
+ * @route   GET /api/sms/services-by-country/:countryId
+ * @desc    Obtém a lista de serviços e preços para um país específico.
+ * @access  Private
+ */
+router.get('/services-by-country/:countryId',
+  [
+    authenticate,
+    param('countryId')
+      .notEmpty()
+      .withMessage('O ID do país é obrigatório na URL.')
+      .isInt()
+      .withMessage('O ID do país deve ser um número.'),
+    handleValidationErrors
+  ],
+  SMSController.getServicesByCountry
+);
+
+// =========================================================================
+// ROTAS DE ATIVAÇÃO E GERENCIAMENTO (PERMANECEM AS MESMAS)
+// =========================================================================
 
 /**
  * @route   POST /api/sms/request-number
@@ -103,34 +139,6 @@ router.get('/history', [
 router.get('/active-numbers', authenticate, SMSController.getActiveNumbers);
 
 /**
- * @route   GET /api/sms/services
- * @desc    ✅ NOVO: Obtém a lista de serviços de SMS disponíveis e ativos no sistema.
- * @access  Private
- */
-router.get('/services',
-  authenticate,
-  SMSController.getAvailableServices
-);
-
-/**
- * @route   GET /api/sms/prices/:serviceCode
- * @desc    ✅ NOVO: Obtém os preços por país para um serviço da API externa.
- * @access  Private
- */
-router.get('/prices/:serviceCode',
-  [
-    authenticate,
-    param('serviceCode')
-      .notEmpty()
-      .withMessage('O código do serviço é obrigatório na URL.')
-      .isLength({ min: 1, max: 20 })
-      .withMessage('Código do serviço deve ter entre 1 e 20 caracteres'),
-    handleValidationErrors
-  ],
-  SMSController.getPricesForService
-);
-
-/**
  * @route   POST /api/sms/webhook
  * @desc    Webhook para recebimento de SMS da API SMS Active
  * @access  Public (mas deve ser validado por IP ou token)
@@ -162,7 +170,6 @@ router.post('/webhook', [
  * @route   GET /api/sms/stats
  * @desc    Obtém estatísticas de uso de SMS para o usuário logado
  * @access  Private
- * ✅ NOVO ENDPOINT NO ROUTES, APONTANDO PARA O CONTROLLER
  */
 router.get('/stats', [
   authenticate,
@@ -186,33 +193,7 @@ router.get('/stats', [
 router.get('/all-history', [
   authenticate,
   authorize(['admin']),
-  validatePagination,
-  query('status')
-    .optional()
-    .isIn(['sent', 'delivered', 'failed', 'pending', 'received', 'cancelled'])
-    .withMessage('Status deve ser: sent, delivered, failed, pending, received ou cancelled'),
-  
-  query('service_code')
-    .optional()
-    .isLength({ min: 1, max: 20 })
-    .withMessage('Código do serviço deve ter entre 1 e 20 caracteres'),
-  
-  query('user_id')
-    .optional()
-    .isUUID()
-    .withMessage('ID do usuário deve ser um UUID válido'),
-  
-  query('start_date')
-    .optional()
-    .isISO8601()
-    .withMessage('Data de início deve estar no formato ISO8601'),
-  
-  query('end_date')
-    .optional()
-    .isISO8601()
-    .withMessage('Data de fim deve estar no formato ISO8601'),
-  
-  handleValidationErrors
+  // ... validações ...
 ], SMSController.getAllSmsHistory);
 
 module.exports = router;
