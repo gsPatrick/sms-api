@@ -1,199 +1,205 @@
 /**
- * Rotas de Créditos
+ * Rotas de SMS
  * 
- * Define as rotas HTTP para gerenciamento de créditos
+ * Define as rotas HTTP para gerenciamento de SMS
  * incluindo validações e middlewares de segurança
  */
 
 const express = require('express');
-const CreditsController = require('./Credits.controller');
+
+// =========================================================================
+// ✅ CORREÇÃO APLICADA AQUI
+// Estava importando './Credits.controller' por engano.
+// O correto é importar o SMS.controller.
+// =========================================================================
+const SMSController = require('./SMS.controller');
+
 const { authenticate, authorize } = require('../../Utils/auth');
 const {
-  validatePagination,
+  validateSmsRequest,
   validateUUID,
-  handleValidationErrors,
-  validateTransactionHistory
+  validatePagination,
+  handleValidationErrors
 } = require('../../Utils/validation');
-const { body, query } = require('express-validator');
+const { body, query, param } = require('express-validator');
 
 const router = express.Router();
 
-/**
- * @route   GET /api/credits/balance
- * @desc    Obtém o saldo de créditos do usuário
- * @access  Private
- */
-router.get('/balance', authenticate, CreditsController.getBalance);
-
 // =========================================================================
-// ✅ NOVO ENDPOINT PÚBLICO PARA TESTES
-// AVISO: REMOVER ANTES DE IR PARA PRODUÇÃO!
-// =========================================================================
-/**
- * @route   POST /api/credits/add-balance-for-self (TESTE)
- * @desc    Adiciona créditos à própria conta do usuário (APENAS PARA TESTES).
- * @access  Private (Qualquer usuário autenticado)
- */
-router.post('/add-balance-for-self', [
-  authenticate, // Autentica para saber QUEM é o usuário
-  body('amount')
-    .isFloat({ min: 0.01 })
-    .withMessage('O valor deve ser um número positivo maior que 0.01'),
-  handleValidationErrors
-], CreditsController.addBalanceForSelf);
+// ROTAS PARA A LÓGICA DE SERVIÇO -> PAÍS
 // =========================================================================
 
-
 /**
- * @route   POST /api/credits/add
- * @desc    Adiciona créditos ao usuário (apenas Admin)
- * @access  Private (Admin only)
- */
-router.post('/add', [
-  authenticate,
-  authorize(['admin']),
-  body('user_id')
-    .isUUID()
-    .withMessage('ID do usuário deve ser um UUID válido'),
-  
-  body('amount')
-    .isFloat({ min: 0.01 })
-    .withMessage('Valor deve ser um número positivo maior que 0'),
-  
-  body('description')
-    .optional()
-    .isLength({ max: 500 })
-    .withMessage('Descrição deve ter no máximo 500 caracteres'),
-  
-  handleValidationErrors
-], CreditsController.addCredits);
-
-/**
- * @route   GET /api/credits/history
- * @desc    Obtém o histórico de transações do usuário
+ * @route   GET /api/sms/get-all-services
+ * @desc    Obtém a lista de todos os serviços disponíveis.
  * @access  Private
  */
-router.get('/history', [
-  authenticate,
-  validatePagination,
-  ...validateTransactionHistory,
-  handleValidationErrors
-], CreditsController.getTransactionHistory);
+router.get('/get-all-services', 
+    authenticate, 
+    SMSController.getAllServices
+);
 
 /**
- * @route   GET /api/credits/stats
- * @desc    Obtém estatísticas de créditos do usuário
+ * @route   GET /api/sms/countries-by-service/:serviceCode
+ * @desc    Obtém a lista de países e preços para um serviço específico.
  * @access  Private
  */
-router.get('/stats', authenticate, CreditsController.getCreditStats);
+router.get('/countries-by-service/:serviceCode',
+  [
+    authenticate,
+    param('serviceCode')
+      .notEmpty()
+      .withMessage('O código do serviço é obrigatório na URL.')
+      .isString()
+      .withMessage('O código do serviço deve ser um texto.'),
+    handleValidationErrors
+  ],
+  SMSController.getCountriesByService
+);
+
+// =========================================================================
+// ROTAS DE ATIVAÇÃO E GERENCIAMENTO
+// =========================================================================
 
 /**
- * @route   POST /api/credits/refund
- * @desc    Processa reembolso de créditos (apenas Admin)
- * @access  Private (Admin only)
+ * @route   POST /api/sms/request-number
+ * @desc    Solicita um número para recebimento de SMS OTP
+ * @access  Private
  */
-router.post('/refund', [
+router.post('/request-number', [
   authenticate,
-  authorize(['admin']),
-  body('user_id')
-    .isUUID()
-    .withMessage('ID do usuário deve ser um UUID válido'),
-  
-  body('amount')
-    .isFloat({ min: 0.01 })
-    .withMessage('Valor deve ser um número positivo maior que 0'),
-  
+  validateSmsRequest
+], SMSController.requestNumber);
+
+/**
+ * @route   GET /api/sms/status/:activeNumberId
+ * @desc    Verifica o status de recebimento de SMS
+ * @access  Private
+ */
+router.get('/status/:activeNumberId', [
+  authenticate,
+  validateUUID('activeNumberId')
+], SMSController.checkSmsStatus);
+
+/**
+ * @route   POST /api/sms/reactivate/:activeNumberId
+ * @desc    Reativa um número para receber outro SMS
+ * @access  Private
+ */
+router.post('/reactivate/:activeNumberId', [
+  authenticate,
+  validateUUID('activeNumberId')
+], SMSController.reactivateNumber);
+
+/**
+ * @route   POST /api/sms/cancel/:activeNumberId
+ * @desc    Cancela um número ativo
+ * @access  Private
+ */
+router.post('/cancel/:activeNumberId', [
+  authenticate,
+  validateUUID('activeNumberId'),
   body('reason')
     .optional()
     .isLength({ max: 500 })
     .withMessage('Motivo deve ter no máximo 500 caracteres'),
   
   handleValidationErrors
-], CreditsController.refundCredits);
+], SMSController.cancelNumber);
 
 /**
- * @route   GET /api/credits/all-transactions
- * @desc    Obtém histórico de transações de todos os usuários (apenas Admin)
+ * @route   GET /api/sms/history
+ * @desc    Obtém o histórico de SMS do usuário
+ * @access  Private
+ */
+router.get('/history', [
+  authenticate,
+  validatePagination,
+  query('status')
+    .optional()
+    .isIn(['sent', 'delivered', 'failed', 'pending', 'received', 'cancelled'])
+    .withMessage('Status deve ser: sent, delivered, failed, pending, received ou cancelled'),
+  
+  query('service_code')
+    .optional()
+    .isLength({ min: 1, max: 20 })
+    .withMessage('Código do serviço deve ter entre 1 e 20 caracteres'),
+  
+  query('start_date')
+    .optional()
+    .isISO8601()
+    .withMessage('Data de início deve estar no formato ISO8601'),
+  
+  query('end_date')
+    .optional()
+    .isISO8601()
+    .withMessage('Data de fim deve estar no formato ISO8601'),
+  
+  handleValidationErrors
+], SMSController.getSmsHistory);
+
+/**
+ * @route   GET /api/sms/active-numbers
+ * @desc    Obtém os números ativos do usuário
+ * @access  Private
+ */
+router.get('/active-numbers', authenticate, SMSController.getActiveNumbers);
+
+/**
+ * @route   POST /api/sms/webhook
+ * @desc    Webhook para recebimento de SMS da API SMS Active
+ * @access  Public
+ */
+router.post('/webhook', [
+  body('activation_id')
+    .notEmpty()
+    .withMessage('ID de ativação é obrigatório'),
+  
+  body('status')
+    .optional()
+    .isIn(['completed', 'cancelled', 'waiting'])
+    .withMessage('Status deve ser: completed, cancelled ou waiting'),
+  
+  body('code')
+    .optional()
+    .isLength({ min: 1, max: 20 })
+    .withMessage('Código deve ter entre 1 e 20 caracteres'),
+  
+  body('phone')
+    .optional()
+    .isLength({ min: 1, max: 20 })
+    .withMessage('Telefone deve ter entre 1 e 20 caracteres'),
+  
+  handleValidationErrors
+], SMSController.smsWebhook);
+
+/**
+ * @route   GET /api/sms/stats
+ * @desc    Obtém estatísticas de uso de SMS para o usuário logado
+ * @access  Private
+ */
+router.get('/stats', [
+  authenticate,
+  query('period')
+    .optional()
+    .isIn(['daily', 'monthly'])
+    .withMessage('Período deve ser "daily" ou "monthly"'),
+  query('days')
+    .optional()
+    .isInt({ min: 1, max: 365 })
+    .withMessage('Dias deve ser um número inteiro entre 1 e 365'),
+  handleValidationErrors
+], SMSController.getSmsUsageStats);
+
+/**
+ * @route   GET /api/sms/all-history
+ * @desc    Obtém histórico de SMS de todos os usuários (apenas Admin)
  * @access  Private (Admin only)
  */
-router.get('/all-transactions', [
+router.get('/all-history', [
   authenticate,
   authorize(['admin']),
-  validatePagination,
-  ...validateTransactionHistory,
-  query('user_id')
-    .optional()
-    .isUUID()
-    .withMessage('ID do usuário deve ser um UUID válido'),
-  handleValidationErrors
-], CreditsController.getAllTransactions);
-
-
-
-// =========================================================================
-// ✅ NOVAS ROTAS PARA A LÓGICA DE SERVIÇO -> PAÍS
-// =========================================================================
-
-/**
- * @route   GET /api/sms/get-all-services
- * @desc    Obtém a lista de todos os serviços disponíveis.
- * @access  Private
- */
-router.get('/get-all-services', 
-    authenticate, 
-    SMSController.getAllServices
-);
-
-/**
- * @route   GET /api/sms/countries-by-service/:serviceCode
- * @desc    Obtém a lista de países e preços para um serviço específico.
- * @access  Private
- */
-router.get('/countries-by-service/:serviceCode',
-  [
-    authenticate,
-    param('serviceCode')
-      .notEmpty()
-      .withMessage('O código do serviço é obrigatório na URL.')
-      .isString()
-      .withMessage('O código do serviço deve ser um texto.'),
-    handleValidationErrors
-  ],
-  SMSController.getCountriesByService
-);
-
-
-// =========================================================================
-// ✅ NOVAS ROTAS PARA A LÓGICA DE SERVIÇO -> PAÍS
-// =========================================================================
-
-/**
- * @route   GET /api/sms/get-all-services
- * @desc    Obtém a lista de todos os serviços disponíveis.
- * @access  Private
- */
-router.get('/get-all-services', 
-    authenticate, 
-    SMSController.getAllServices
-);
-
-/**
- * @route   GET /api/sms/countries-by-service/:serviceCode
- * @desc    Obtém a lista de países e preços para um serviço específico.
- * @access  Private
- */
-router.get('/countries-by-service/:serviceCode',
-  [
-    authenticate,
-    param('serviceCode')
-      .notEmpty()
-      .withMessage('O código do serviço é obrigatório na URL.')
-      .isString()
-      .withMessage('O código do serviço deve ser um texto.'),
-    handleValidationErrors
-  ],
-  SMSController.getCountriesByService
-);
-
+  // ... validações ...
+], SMSController.getAllSmsHistory);
 
 module.exports = router;
