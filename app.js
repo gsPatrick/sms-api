@@ -113,7 +113,7 @@ const startServer = async () => {
     await testConnection();
 
     console.log('🧨 Sincronizando banco de dados com force: true...');
-    await syncDatabase(true); // <-- aqui força a recriação das tabelas
+    await syncDatabase(false); // <-- aqui força a recriação das tabelas
 
     console.log('🚀 Iniciando servidor...');
     app.listen(PORT, () => {
