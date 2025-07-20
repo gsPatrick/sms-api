@@ -258,70 +258,7 @@ class CreditsService {
     return transaction;
   }
 
-  // =========================================================================
-  // ✅ NOVOS MÉTODOS DE SERVIÇO PARA O FLUXO SERVIÇO -> PAÍS
-  // =========================================================================
 
-  /**
-   * Obtém a lista de todos os serviços disponíveis na API Externa.
-   * @returns {Promise<Array>} - Lista de serviços formatada.
-   */
-  async getAllAvailableServices() {
-    try {
-      // Esta é uma nova função que precisaremos adicionar ao nosso smsActive.js
-      const servicesFromApi = await smsActiveAPI.getServicesList();
-      
-      const formattedServices = servicesFromApi.map(service => ({
-        code: service.code,
-        name: serviceNamesMap[service.code] || service.name, // Usa nosso mapa ou o nome da API
-      })).sort((a, b) => a.name.localeCompare(b.name));
-
-      return formattedServices;
-    } catch (error) {
-      console.error('Erro ao buscar lista de serviços da API externa:', error);
-      throw new Error('Não foi possível obter a lista de serviços.');
-    }
-  }
-
-  /**
-   * Obtém a lista de países com preços para um serviço específico.
-   * @param {string} serviceCode - O código do serviço (ex: 'wa').
-   * @returns {Promise<Array>} - Lista de países com preço e quantidade.
-   */
-  async getCountriesByService(serviceCode) {
-    try {
-      const pricesFromApi = await smsActiveAPI.getPricesForService(serviceCode);
-      const allCountries = await smsActiveAPI.getCountries();
-
-      if (!pricesFromApi[serviceCode]) {
-        return []; // Nenhum país disponível para este serviço
-      }
-
-      const marginSetting = await Setting.findByPk('SMS_PRICE_MARGIN');
-      const margin = marginSetting ? parseFloat(marginSetting.value) : 1.2;
-
-      const formattedCountries = Object.entries(pricesFromApi[serviceCode])
-        .filter(([_, details]) => details.cost !== null && !isNaN(details.cost) && details.count > 0)
-        .map(([countryId, details]) => {
-            const cost = parseFloat(details.cost);
-            const sellPrice = cost * margin;
-
-            return {
-                id: countryId,
-                name: allCountries[countryId] ? allCountries[countryId].eng : `País #${countryId}`,
-                cost: cost,
-                sellPrice: sellPrice.toFixed(2),
-                count: details.count,
-            };
-        })
-        .sort((a, b) => a.name.localeCompare(b.name));
-
-      return formattedCountries;
-    } catch (error) {
-      console.error(`Erro ao buscar países para o serviço ${serviceCode}:`, error);
-      throw new Error(`Não foi possível obter os países para o serviço selecionado.`);
-    }
-  }
   
 }
 

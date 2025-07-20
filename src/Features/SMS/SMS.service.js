@@ -241,6 +241,71 @@ class SMSService {
   async cancelNumber(userId, activeNumberId, reason = 'Cancelado pelo usuário') { const activeNumber = await ActiveNumber.findOne({ where: { id: activeNumberId, user_id: userId }}); if (!activeNumber) throw new Error('Número ativo não encontrado'); if (activeNumber.status === 'cancelled') throw new Error('Número já foi cancelado'); try { await smsActiveAPI.cancelActivation(activeNumber.api_activation_id); await activeNumber.markAsCancelled(); const smsMessage = await SmsMessage.findOne({ where: { api_message_id: activeNumber.api_activation_id } }); if (smsMessage) { await smsMessage.markAsCancelled(); } return activeNumber; } catch (error) { throw new Error(`Erro ao cancelar número: ${error.message}`); } }
   async getSmsHistory(userId, options = {}) { const { page = 1, limit = 20, status, service_code, startDate, endDate } = options; const offset = (page - 1) * limit; const where = { user_id: userId }; if (status) { where.status = status; } if (service_code) { where.service_code = service_code; } if (startDate || endDate) { where.created_at = {}; if (startDate) { where.created_at[Op.gte] = new Date(startDate); } if (endDate) { where.created_at[Op.lte] = new Date(endDate); } } const { count, rows } = await SmsMessage.findAndCountAll({ where, order: [['created_at', 'DESC']], limit: parseInt(limit), offset: parseInt(offset), include: [{ model: User, as: 'user', attributes: ['id', 'username', 'email'] }] }); return { messages: rows, pagination: { current_page: parseInt(page), total_pages: Math.ceil(count / limit), total_items: count, items_per_page: parseInt(limit) } }; }
   async getActiveNumbers(userId) { return ActiveNumber.findAll({ where: { user_id: userId, status: 'active' }, order: [['created_at', 'DESC']] }); }
+
+    // =========================================================================
+  // ✅ NOVOS MÉTODOS DE SERVIÇO PARA O FLUXO SERVIÇO -> PAÍS
+  // =========================================================================
+
+  /**
+   * Obtém a lista de todos os serviços disponíveis na API Externa.
+   * @returns {Promise<Array>} - Lista de serviços formatada.
+   */
+  async getAllAvailableServices() {
+    try {
+      // Esta é uma nova função que precisaremos adicionar ao nosso smsActive.js
+      const servicesFromApi = await smsActiveAPI.getServicesList();
+      
+      const formattedServices = servicesFromApi.map(service => ({
+        code: service.code,
+        name: serviceNamesMap[service.code] || service.name, // Usa nosso mapa ou o nome da API
+      })).sort((a, b) => a.name.localeCompare(b.name));
+
+      return formattedServices;
+    } catch (error) {
+      console.error('Erro ao buscar lista de serviços da API externa:', error);
+      throw new Error('Não foi possível obter a lista de serviços.');
+    }
+  }
+
+  /**
+   * Obtém a lista de países com preços para um serviço específico.
+   * @param {string} serviceCode - O código do serviço (ex: 'wa').
+   * @returns {Promise<Array>} - Lista de países com preço e quantidade.
+   */
+  async getCountriesByService(serviceCode) {
+    try {
+      const pricesFromApi = await smsActiveAPI.getPricesForService(serviceCode);
+      const allCountries = await smsActiveAPI.getCountries();
+
+      if (!pricesFromApi[serviceCode]) {
+        return []; // Nenhum país disponível para este serviço
+      }
+
+      const marginSetting = await Setting.findByPk('SMS_PRICE_MARGIN');
+      const margin = marginSetting ? parseFloat(marginSetting.value) : 1.2;
+
+      const formattedCountries = Object.entries(pricesFromApi[serviceCode])
+        .filter(([_, details]) => details.cost !== null && !isNaN(details.cost) && details.count > 0)
+        .map(([countryId, details]) => {
+            const cost = parseFloat(details.cost);
+            const sellPrice = cost * margin;
+
+            return {
+                id: countryId,
+                name: allCountries[countryId] ? allCountries[countryId].eng : `País #${countryId}`,
+                cost: cost,
+                sellPrice: sellPrice.toFixed(2),
+                count: details.count,
+            };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      return formattedCountries;
+    } catch (error) {
+      console.error(`Erro ao buscar países para o serviço ${serviceCode}:`, error);
+      throw new Error(`Não foi possível obter os países para o serviço selecionado.`);
+    }
+  }
 }
 
 module.exports = new SMSService();

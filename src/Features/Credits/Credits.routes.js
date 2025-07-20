@@ -25,18 +25,24 @@ const router = express.Router();
  */
 router.get('/balance', authenticate, CreditsController.getBalance);
 
+// =========================================================================
+// ✅ NOVO ENDPOINT PÚBLICO PARA TESTES
+// AVISO: REMOVER ANTES DE IR PARA PRODUÇÃO!
+// =========================================================================
 /**
  * @route   POST /api/credits/add-balance-for-self (TESTE)
  * @desc    Adiciona créditos à própria conta do usuário (APENAS PARA TESTES).
  * @access  Private (Qualquer usuário autenticado)
  */
 router.post('/add-balance-for-self', [
-  authenticate,
+  authenticate, // Autentica para saber QUEM é o usuário
   body('amount')
     .isFloat({ min: 0.01 })
     .withMessage('O valor deve ser um número positivo maior que 0.01'),
   handleValidationErrors
 ], CreditsController.addBalanceForSelf);
+// =========================================================================
+
 
 /**
  * @route   POST /api/credits/add
@@ -121,12 +127,5 @@ router.get('/all-transactions', [
     .withMessage('ID do usuário deve ser um UUID válido'),
   handleValidationErrors
 ], CreditsController.getAllTransactions);
-
-
-// =========================================================================
-// AS ROTAS DE SMS QUE ESTAVAM AQUI FORAM REMOVIDAS, POIS PERTENCEM
-// AO ARQUIVO SMS.routes.js
-// =========================================================================
-
 
 module.exports = router;
