@@ -89,7 +89,7 @@ const testConnection = async () => {
 /**
  * Função para sincronizar os modelos com o banco de dados
  */
-const syncDatabase = async (force = false) => {
+const syncDatabase = async (force = true) => {
   try {
     await sequelize.sync({ force });
     console.log('✅ Modelos sincronizados com o banco de dados.');
