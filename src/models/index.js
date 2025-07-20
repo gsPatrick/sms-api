@@ -11,7 +11,7 @@ const Transaction = require('./Transaction');
 const SmsMessage = require('./SmsMessage');
 const SmsService = require('./SmsService');
 const ActiveNumber = require('./ActiveNumber');
-const Setting = require('./Setting'); // NOVO: Importar o novo modelo
+const Setting = require('./Settings'); // NOVO: Importar o novo modelo
 
 // Definindo as associações entre os modelos
 
