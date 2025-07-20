@@ -13,7 +13,7 @@ const creditsRoutes = require('../Features/Credits/Credits.routes');
 const smsRoutes = require('../Features/SMS/SMS.routes');
 const adminRoutes = require('../Features/Admin/Admin.routes');
 const paymentsRoutes = require('../Features/Payments/Payments.routes');
-const settingsRoutes = require('../Features/Settings/Settings.routes'); // NOVO: Importar rotas de configurações
+const settingsRoutes = require('../Features/Settings/Settings.routes');
 
 const router = express.Router();
 
@@ -70,11 +70,16 @@ router.use('/admin', adminRoutes);
  */
 router.use('/payments', paymentsRoutes);
 
+// =========================================================================
+// CORREÇÃO APLICADA AQUI
+// Garantimos que a rota funcione com ou sem a barra no final
+// =========================================================================
 /**
- * NOVO: Rotas de configurações
+ * Rotas de configurações
  * /api/settings/*
  */
-router.use('/settings', settingsRoutes);
+router.use(['/settings', '/settings/'], settingsRoutes);
+
 
 /**
  * Middleware para rotas não encontradas
@@ -101,4 +106,3 @@ router.use((error, req, res, next) => {
 });
 
 module.exports = router;
-
