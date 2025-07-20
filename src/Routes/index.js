@@ -13,6 +13,7 @@ const creditsRoutes = require('../Features/Credits/Credits.routes');
 const smsRoutes = require('../Features/SMS/SMS.routes');
 const adminRoutes = require('../Features/Admin/Admin.routes');
 const paymentsRoutes = require('../Features/Payments/Payments.routes');
+const settingsRoutes = require('../Features/Settings/Settings.routes'); // NOVO: Importar rotas de configurações
 
 const router = express.Router();
 
@@ -68,6 +69,12 @@ router.use('/admin', adminRoutes);
  * /api/payments/*
  */
 router.use('/payments', paymentsRoutes);
+
+/**
+ * NOVO: Rotas de configurações
+ * /api/settings/*
+ */
+router.use('/settings', settingsRoutes);
 
 /**
  * Middleware para rotas não encontradas
