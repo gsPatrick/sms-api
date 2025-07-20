@@ -25,24 +25,18 @@ const router = express.Router();
  */
 router.get('/balance', authenticate, CreditsController.getBalance);
 
-// =========================================================================
-// ✅ NOVO ENDPOINT PÚBLICO PARA TESTES
-// AVISO: REMOVER ANTES DE IR PARA PRODUÇÃO!
-// =========================================================================
 /**
  * @route   POST /api/credits/add-balance-for-self (TESTE)
  * @desc    Adiciona créditos à própria conta do usuário (APENAS PARA TESTES).
  * @access  Private (Qualquer usuário autenticado)
  */
 router.post('/add-balance-for-self', [
-  authenticate, // Autentica para saber QUEM é o usuário
+  authenticate,
   body('amount')
     .isFloat({ min: 0.01 })
     .withMessage('O valor deve ser um número positivo maior que 0.01'),
   handleValidationErrors
 ], CreditsController.addBalanceForSelf);
-// =========================================================================
-
 
 /**
  * @route   POST /api/credits/add
@@ -129,38 +123,10 @@ router.get('/all-transactions', [
 ], CreditsController.getAllTransactions);
 
 
-
 // =========================================================================
-// ✅ NOVAS ROTAS PARA A LÓGICA DE SERVIÇO -> PAÍS
+// AS ROTAS DE SMS QUE ESTAVAM AQUI FORAM REMOVIDAS, POIS PERTENCEM
+// AO ARQUIVO SMS.routes.js
 // =========================================================================
-
-/**
- * @route   GET /api/sms/get-all-services
- * @desc    Obtém a lista de todos os serviços disponíveis.
- * @access  Private
- */
-router.get('/get-all-services', 
-    authenticate, 
-    SMSController.getAllServices
-);
-
-/**
- * @route   GET /api/sms/countries-by-service/:serviceCode
- * @desc    Obtém a lista de países e preços para um serviço específico.
- * @access  Private
- */
-router.get('/countries-by-service/:serviceCode',
-  [
-    authenticate,
-    param('serviceCode')
-      .notEmpty()
-      .withMessage('O código do serviço é obrigatório na URL.')
-      .isString()
-      .withMessage('O código do serviço deve ser um texto.'),
-    handleValidationErrors
-  ],
-  SMSController.getCountriesByService
-);
 
 
 module.exports = router;
