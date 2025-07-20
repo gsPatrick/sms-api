@@ -14,7 +14,7 @@ const {
   validatePagination,
   handleValidationErrors
 } = require('../../Utils/validation');
-const { body, query } = require('express-validator');
+const { body, query, param } = require('express-validator');
 
 const router = express.Router();
 
@@ -101,6 +101,34 @@ router.get('/history', [
  * @access  Private
  */
 router.get('/active-numbers', authenticate, SMSController.getActiveNumbers);
+
+/**
+ * @route   GET /api/sms/services
+ * @desc    ✅ NOVO: Obtém a lista de serviços de SMS disponíveis e ativos no sistema.
+ * @access  Private
+ */
+router.get('/services',
+  authenticate,
+  SMSController.getAvailableServices
+);
+
+/**
+ * @route   GET /api/sms/prices/:serviceCode
+ * @desc    ✅ NOVO: Obtém os preços por país para um serviço da API externa.
+ * @access  Private
+ */
+router.get('/prices/:serviceCode',
+  [
+    authenticate,
+    param('serviceCode')
+      .notEmpty()
+      .withMessage('O código do serviço é obrigatório na URL.')
+      .isLength({ min: 1, max: 20 })
+      .withMessage('Código do serviço deve ter entre 1 e 20 caracteres'),
+    handleValidationErrors
+  ],
+  SMSController.getPricesForService
+);
 
 /**
  * @route   POST /api/sms/webhook

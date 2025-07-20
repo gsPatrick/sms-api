@@ -6,8 +6,9 @@
  */
 
 const SMSService = require('./SMS.service'); // ✅ Importa o SMSService
-const { ActiveNumber, SmsMessage, User } = require('../../models');
+const { ActiveNumber, SmsMessage, User, SmsService: LocalSmsService } = require('../../models');
 const { Op } = require('sequelize');
+const smsActiveAPI = require('../../Utils/smsActive'); // ✅ Importa a utility da API externa
 
 class SMSController {
   /**
@@ -146,6 +147,60 @@ class SMSController {
       res.status(400).json({
         success: false,
         message: error.message
+      });
+    }
+  }
+
+  /**
+   * ✅ NOVO: Obtém a lista de serviços de SMS disponíveis e ativos no sistema local.
+   * GET /api/sms/services
+   */
+  async getAvailableServices(req, res) {
+    try {
+      const services = await LocalSmsService.findAll({
+        where: { active: true },
+        order: [['name', 'ASC']],
+        attributes: ['id', 'name', 'code', 'description', 'price_per_otp', 'category', 'icon_url']
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Serviços disponíveis obtidos com sucesso',
+        data: services
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+
+  /**
+   * ✅ NOVO: Obtém os preços e disponibilidade por país para um serviço da API externa.
+   * GET /api/sms/prices/:serviceCode
+   */
+  async getPricesForService(req, res) {
+    try {
+      const { serviceCode } = req.params;
+
+      if (!serviceCode) {
+        return res.status(400).json({ success: false, message: 'O código do serviço é obrigatório.' });
+      }
+
+      // Chama a função da utility que interage com a API externa
+      const prices = await smsActiveAPI.getPrices('', serviceCode);
+
+      res.status(200).json({
+        success: true,
+        message: `Preços para o serviço ${serviceCode} obtidos com sucesso.`,
+        data: prices
+      });
+    } catch (error) {
+      console.error(`Erro ao obter preços para o serviço ${serviceCode}:`, error);
+      res.status(500).json({
+        success: false,
+        message: `Erro ao obter preços da API externa: ${error.message}`
       });
     }
   }
