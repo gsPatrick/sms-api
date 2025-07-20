@@ -1,22 +1,17 @@
-/**
- * Utilitários para integração com SMS Active API
- * 
- * Funções para interagir com a API do SMS Active
- * para gerenciamento de números virtuais e recebimento de SMS
- */
-
 const axios = require('axios');
 
 class SmsActiveAPI {
   constructor() {
-    this.baseURL = process.env.SMS_ACTIVE_BASE_URL;
-    this.apiKey = process.env.SMS_ACTIVE_API_KEY;
+    // Usando o endpoint correto da API V1
+    this.baseURL = 'https://api.sms-activate.org/stubs/handler_api.php';
+    this.apiKey = process.env.SMS_ACTIVE_API_KEY; // Certifique-se que sua .env tem SMS_ACTIVE_API_KEY
   }
 
   /**
-   * Faz uma requisição para a API SMS Active
+   * Faz uma requisição para a API SMS Active.
+   * A API V1 tem um retorno misto (às vezes JSON, às vezes texto), então tratamos ambos.
    * @param {Object} params - Parâmetros da requisição
-   * @returns {Object} - Resposta da API
+   * @returns {Object|string} - Resposta da API
    */
   async makeRequest(params) {
     try {
@@ -27,210 +22,117 @@ class SmsActiveAPI {
         },
         timeout: 30000
       });
-
+      
+      // A API V1 às vezes retorna JSON, às vezes texto.
+      // O axios tentará parsear JSON automaticamente se o header for 'application/json'.
+      // Se não for, response.data será uma string.
       return response.data;
+
     } catch (error) {
-      console.error('Erro na requisição SMS Active:', error.message);
-      throw new Error(`Erro na API SMS Active: ${error.message}`);
+      console.error('Erro na requisição para SMS Activate:', error.message);
+      // Se a API retornar um erro (ex: 4xx, 5xx), o axios lança uma exceção.
+      // Podemos inspecionar error.response.data se houver mais detalhes.
+      if (error.response && error.response.data) {
+        throw new Error(`Erro da API SMS Activate: ${error.response.data}`);
+      }
+      throw new Error(`Erro de comunicação com a API SMS Activate: ${error.message}`);
     }
   }
 
   /**
-   * Obtém o saldo da conta
+   * Obtém o saldo da conta.
+   * Retorna uma string: ACCESS_BALANCE:123.45
    * @returns {number} - Saldo da conta
    */
   async getBalance() {
-    const response = await this.makeRequest({
-      action: 'getBalance'
-    });
-
-    if (response.includes('ACCESS_BALANCE')) {
+    const response = await this.makeRequest({ action: 'getBalance' });
+    if (typeof response === 'string' && response.includes('ACCESS_BALANCE')) {
       return parseFloat(response.split(':')[1]);
     }
-
-    throw new Error('Erro ao obter saldo');
+    throw new Error(`Erro ao obter saldo: ${response}`);
   }
 
   /**
-   * Obtém a quantidade de números disponíveis por serviço
-   * @param {string} country - Código do país (opcional)
-   * @param {string} operator - Operadora (opcional)
-   * @returns {Object} - Quantidade de números disponíveis
+   * ✅ CORRIGIDO: Obtém a lista de países.
+   * A API retorna um objeto JSON com os detalhes de cada país.
+   * @returns {Object} - Objeto de países.
    */
-  async getNumbersStatus(country = '0', operator = '') {
-    const params = {
-      action: 'getNumbersStatus',
-      country
-    };
-
-    if (operator) {
-      params.operator = operator;
-    }
-
-    return await this.makeRequest(params);
+  async getCountries() {
+    return this.makeRequest({ action: 'getCountries' });
   }
 
   /**
-   * Solicita um número para recebimento de SMS
+   * ✅ CORRIGIDO: Obtém os preços atuais por país e/ou serviço.
+   * A API retorna um objeto JSON com a estrutura { "countryId": { "serviceCode": { details } } }
+   * @param {string} country - Código do país (opcional)
+   * @param {string} service - Código do serviço (opcional)
+   * @returns {Object} - Objeto de preços.
+   */
+  async getPrices(country = '', service = '') {
+    const params = { action: 'getPrices' };
+    if (country) params.country = country;
+    if (service) params.service = service;
+    return this.makeRequest(params);
+  }
+
+  /**
+   * Solicita um número para recebimento de SMS.
+   * Retorna uma string: ACCESS_NUMBER:ID:NUMBER
    * @param {string} service - Código do serviço
    * @param {string} country - Código do país
    * @param {string} operator - Operadora (opcional)
    * @returns {Object} - Dados do número solicitado
    */
   async getNumber(service, country = '0', operator = '') {
-    const params = {
-      action: 'getNumber',
-      service,
-      country
-    };
-
-    if (operator) {
-      params.operator = operator;
-    }
+    const params = { action: 'getNumber', service, country };
+    if (operator) params.operator = operator;
 
     const response = await this.makeRequest(params);
 
     if (typeof response === 'string' && response.includes('ACCESS_NUMBER')) {
       const [, id, number] = response.split(':');
-      return {
-        id,
-        number,
-        status: 'active'
-      };
+      return { id, number, status: 'active' };
     }
-
-    // Tratamento de erros
-    if (response === 'NO_NUMBERS') {
-      throw new Error('Nenhum número disponível');
-    }
-    if (response === 'NO_BALANCE') {
-      throw new Error('Saldo insuficiente');
-    }
-    if (response === 'BAD_ACTION') {
-      throw new Error('Ação inválida');
-    }
-    if (response === 'BAD_SERVICE') {
-      throw new Error('Serviço inválido');
-    }
-    if (response === 'BAD_KEY') {
-      throw new Error('Chave API inválida');
-    }
-
-    throw new Error(`Erro desconhecido: ${response}`);
+    
+    // Tratamento de outros erros baseados em string
+    throw new Error(`Erro ao solicitar número: ${response}`);
   }
 
   /**
-   * Obtém o status de uma ativação
+   * Obtém o status de uma ativação.
+   * Retorna strings como STATUS_WAIT_CODE, STATUS_OK:12345, etc.
    * @param {string} id - ID da ativação
    * @returns {Object} - Status da ativação
    */
   async getStatus(id) {
-    const response = await this.makeRequest({
-      action: 'getStatus',
-      id
-    });
+    const response = await this.makeRequest({ action: 'getStatus', id });
 
     if (typeof response === 'string') {
-      if (response === 'STATUS_WAIT_CODE') {
-        return { status: 'waiting', code: null };
-      }
-      if (response === 'STATUS_WAIT_RETRY') {
-        return { status: 'waiting_retry', code: null };
-      }
+      if (response === 'STATUS_WAIT_CODE') return { status: 'waiting', code: null };
+      if (response === 'STATUS_WAIT_RETRY') return { status: 'waiting_retry', code: null };
       if (response.includes('STATUS_OK')) {
         const code = response.split(':')[1];
         return { status: 'completed', code };
       }
-      if (response === 'STATUS_CANCEL') {
-        return { status: 'cancelled', code: null };
-      }
+      if (response === 'STATUS_CANCEL') return { status: 'cancelled', code: null };
     }
-
-    return { status: 'unknown', code: null };
+    // Retorna a resposta crua se não for um status conhecido para depuração
+    return { status: 'unknown', code: null, raw: response };
   }
-
+  
   /**
-   * Altera o status de uma ativação
+   * Altera o status de uma ativação.
    * @param {string} id - ID da ativação
-   * @param {number} status - Novo status (1=ready, 3=request_another_sms, 6=complete, 8=cancel)
+   * @param {number} status - Novo status (1, 3, 6, 8)
    * @returns {string} - Resposta da API
    */
   async setStatus(id, status) {
-    const response = await this.makeRequest({
-      action: 'setStatus',
-      id,
-      status
-    });
-
-    return response;
+    return this.makeRequest({ action: 'setStatus', id, status });
   }
 
-  /**
-   * Cancela uma ativação
-   * @param {string} id - ID da ativação
-   * @returns {string} - Resposta da API
-   */
-  async cancelActivation(id) {
-    return await this.setStatus(id, 8);
-  }
-
-  /**
-   * Solicita outro SMS para a mesma ativação
-   * @param {string} id - ID da ativação
-   * @returns {string} - Resposta da API
-   */
-  async requestAnotherSms(id) {
-    return await this.setStatus(id, 3);
-  }
-
-  /**
-   * Marca uma ativação como concluída
-   * @param {string} id - ID da ativação
-   * @returns {string} - Resposta da API
-   */
-  async completeActivation(id) {
-    return await this.setStatus(id, 6);
-  }
-
-  /**
-   * Obtém a lista de serviços disponíveis
-   * @returns {Object} - Lista de serviços
-   */
-  async getServices() {
-    return await this.makeRequest({
-      action: 'getServices'
-    });
-  }
-
-  /**
-   * Obtém a lista de países disponíveis
-   * @returns {Object} - Lista de países
-   */
-  async getCountries() {
-    return await this.makeRequest({
-      action: 'getCountries'
-    });
-  }
-
-  /**
-   * Obtém os preços atuais por país e serviço
-   * @param {string} country - Código do país
-   * @param {string} service - Código do serviço
-   * @returns {Object} - Preços atuais
-   */
-  async getPrices(country = '', service = '') {
-    const params = {
-      action: 'getPrices'
-    };
-
-    if (country) params.country = country;
-    if (service) params.service = service;
-
-    return await this.makeRequest(params);
-  }
-
-  
+  async cancelActivation(id) { return this.setStatus(id, 8); }
+  async requestAnotherSms(id) { return this.setStatus(id, 3); }
+  async completeActivation(id) { return this.setStatus(id, 6); }
 }
 
 module.exports = new SmsActiveAPI();
-
