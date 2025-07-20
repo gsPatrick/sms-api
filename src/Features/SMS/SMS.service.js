@@ -11,38 +11,34 @@ const CreditsService = require('../Credits/Credits.service');
 const { Op, fn, col, literal } = require('sequelize');
 
 // =========================================================================
-// ✅ MAPEAMENTO COMPLETO DE SERVIÇOS USANDO SEU ARQUIVO services.json
-// Isso garante que os nomes exibidos para o usuário sejam sempre corretos.
+// ✅ MAPA DE NOMES DE SERVIÇOS MASSIVAMENTE EXPANDIDO
+// Usando os dados do seu services.json para garantir a tradução correta dos nomes.
 // =========================================================================
 const serviceNamesMap = {
-  "ig": "Instagram+Threads", "go": "Google, Youtube, Gmail", "fb": "Facebook", "wa": "Whatsapp",
-  "tg": "Telegram", "am": "Amazon", "mm": "Microsoft", "hw": "Alipay/Alibaba/1688", "ds": "Discord",
-  "yw": "Grindr", "oi": "Tinder", "vi": "Viber", "mb": "Yahoo", "lf": "TikTok/Douyin",
-  "tw": "Twitter", "wb": "WeChat", "ni": "Gojek", "ka": "Shopee", "fk": "BLIBLI",
-  "ew": "Nike", "ot": "Outro Serviço", "vk": "vk.com", "nv": "Naver", "li": "Baidu", "jg": "Grab",
-  "ev": "Picpay", "ub": "Uber", "sg": "OZON", "ue": "Onet", "vz": "Hinge", "xh": "OVO",
-  "jr": "Samokat", "bw": "Signal", "nz": "Foodpanda", "da": "MTS CashBack", "ts": "PayPal",
-  "uu": "Wildberries", "wx": "Apple", "ju": "Indomaret", "tn": "LinkedIN", "pm": "AOL", "fr": "Dana",
-  "mg": "Magnit", "me": "Line messenger", "ok": "ok.ru", "qf": "RedBook", "aez": "Shein",
-  "ya": "Yandex/Uber", "dl": "Lazada", "ki": "99app", "cn": "Fiverr", "pf": "pof.com",
-  "pc": "Casino/Bet/Gambling", "dh": "eBay", "sn": "OLX", "xd": "Tokopedia", "nf": "Netflix",
-  "kc": "Vinted", "gp": "Ticketmaster", "aaa": "Nubank", "ve": "Dream11", "rr": "Wolt",
-  "bnl": "Reddit", "ua": "BlaBlaCar", "fd": "Mamba", "qq": "Tencent QQ", "kf": "Weibo",
-  "yl": "Yalla", "tm": "Akulaku", "ep": "Temu", "im": "Imo", "bz": "Blizzard",
-  "aor": "OKX", "zk": "Deliveroo", "tl": "Truecaller", "abn": "Bybit", "cq": "Mercado",
-  "mo": "Bumble", "gf": "GoogleVoice", "fv": "Vidio", "tx": "Bolt", "fu": "Snapchat",
-  "wr": "Walmart", "pd": "iFood", "wh": "TanTan", "ly": "Olacabs", "ft": "Bookmakers",
-  "agl": "Betano", "ac": "DoorDash", "afz": "Klarna", "hx": "AliExpress", "aff": "C6 Bank",
-  "aq": "Glovo", "kt": "KakaoTalk", "mt": "Steam", "df": "Happn", "ma": "Mail.ru",
-  "rl": "inDriver", "gq": "Freelancer", "bl": "BIGO LIVE", "qv": "Badoo", "uk": "Airbnb",
-  "aba": "Rappi", "ij": "Revolut", "dr": "OpenAI", "abg": "PagBank", "hb": "Twitch",
-  "bc": "GCash", "ls": "Careem", "vg": "ShellBox", "ie": "bet365", "ta": "Wink", "tu": "Lyft",
-  "tr": "Paysend", "xt": "Flipkart", "alo": "Profee", "ov": "Beget", "hc": "MOMO",
-  "gr": "Astropay", "ms": "NovaPoshta", "ank": "Garena", "hp": "Meesho", "gt": "Gett",
-  "ng": "FunPay", "sr": "Starbucks", "gj": "Carousell", "xr": "Tango", "aon": "Binance",
-  "fh": "Lalamove", "ns": "Oldubil", "sh": "Vkusvill", "zh": "Zoho", "je": "Nanovest",
-  "afe": "Gov.br"
-  // Adicione mais mapeamentos do seu JSON se necessário
+    "ig": "Instagram+Threads", "go": "Google,youtube,Gmail", "fb": "facebook", "wa": "Whatsapp", "tg": "Telegram",
+    "am": "Amazon", "mm": "Microsoft", "hw": "Alipay/Alibaba/1688", "ds": "Discord", "yw": "Grindr",
+    "oi": "Tinder", "vi": "Viber", "mb": "Yahoo", "lf": "TikTok/Douyin", "tw": "Twitter", "wb": "WeChat",
+    "ni": "Gojek", "ka": "Shopee", "fk": "BLIBLI", "ew": "Nike", "ot": "Any other", "vk": "vk.com",
+    "nv": "Naver", "li": "Baidu", "jg": "Grab", "ev": "Picpay", "ub": "Uber", "sg": "OZON", "ue": "Onet",
+    "vz": "Hinge", "xh": "OVO", "jr": "Samokat", "bw": "Signal", "nz": "Foodpanda", "da": "MTS CashBack",
+    "ts": "PayPal", "uu": "Wildberries", "wx": "Apple", "ju": "Indomaret", "tn": "LinkedIN", "pm": "AOL",
+    "fr": "Dana", "mg": "Magnit", "me": "Line messenger", "ok": "ok.ru", "qf": "RedBook", "aez": "Shein",
+    "ya": "Yandex/Uber", "dl": "Lazada", "ki": "99app", "cn": "Fiverr", "pf": "pof.com",
+    "pc": "Casino/bet/gambling", "dh": "eBay", "sn": "OLX", "xd": "Tokopedia", "nf": "Netflix",
+    "kc": "Vinted", "gp": "Ticketmaster", "aaa": "Nubank", "ve": "Dream11", "rr": "Wolt", "bnl": "Reddit",
+    "ua": "BlaBlaCar", "fd": "Mamba", "qq": "Tencent QQ", "kf": "Weibo", "yl": "Yalla", "tm": "Akulaku",
+    "ep": "Temu", "im": "Imo", "bz": "Blizzard", "do": "Leboncoin", "aor": "OKX", "zk": "Deliveroo",
+    "tl": "Truecaller", "abn": "Bybit", "cq": "Mercado", "mo": "Bumble", "gf": "GoogleVoice",
+    "fv": "Vidio", "tx": "Bolt", "fu": "Snapchat", "wr": "Walmart", "pd": "IFood", "wh": "TanTan",
+    "ly": "Olacabs", "ft": "Bookmakers", "agl": "Betano", "ac": "DoorDash", "afz": "Klarna",
+    "hx": "AliExpress", "aff": "C6 Bank", "aq": "Glovo", "mt": "Steam", "df": "Happn", "ma": "Mail.ru",
+    "rl": "inDriver", "gq": "Freelancer", "bl": "BIGO LIVE", "qv": "Badoo", "uk": "Airbnb", "aba": "Rappi",
+    "ij": "Revolut", "dr": "OpenAI", "abg": "PagBank", "hb": "Twitch", "bc": "GCash", "ls": "Careem",
+    "vg": "ShellBox", "ie": "bet365", "ta": "Wink", "tu": "Lyft", "tr": "Paysend", "xt": "Flipkart",
+    "alo": "Profee", "ov": "Beget", "hc": "MOMO", "gr": "Astropay", "ms": "NovaPoshta", "ank": "Garena",
+    "hp": "Meesho", "gt": "Gett", "ng": "FunPay", "sr": "Starbucks", "gj": "Carousell", "xr": "Tango",
+    "aon": "Binance", "fh": "Lalamove", "ns": "Oldubil", "sh": "Vkusvill", "zh": "Zoho",
+    "je": "Nanovest", "afe": "GovBr"
 };
 
 class SMSService {
@@ -55,22 +51,17 @@ class SMSService {
     try {
       const countriesFromApi = await smsActiveAPI.getCountries();
       
-      // =========================================================================
-      // ✅ CORREÇÃO 1: PROCESSANDO A ESTRUTURA DE DADOS CORRETA DA API
-      // A API retorna um objeto de objetos. Convertemos para um array,
-      // filtramos pelos que estão visíveis e usamos o nome em inglês.
-      // =========================================================================
       if (typeof countriesFromApi !== 'object' || countriesFromApi === null) {
           throw new Error('Formato de resposta inesperado da API de países.');
       }
 
       const formattedCountries = Object.values(countriesFromApi)
-        .filter(country => country && country.visible === 1) // Filtra apenas países visíveis e válidos
+        .filter(country => country && country.visible === 1)
         .map(country => ({
             id: country.id.toString(),
-            name: country.eng, // Usa o nome em inglês (eng), que é mais confiável
+            name: country.eng,
         }))
-        .sort((a, b) => a.name.localeCompare(b.name)); // Ordena alfabeticamente
+        .sort((a, b) => a.name.localeCompare(b.name));
 
       return formattedCountries;
     } catch (error) {
@@ -89,16 +80,12 @@ class SMSService {
       const pricesFromApi = await smsActiveAPI.getPrices(countryId);
 
       if (!pricesFromApi[countryId]) {
-        return []; // Nenhum serviço para este país
+        return [];
       }
 
       const marginSetting = await Setting.findByPk('SMS_PRICE_MARGIN');
-      const margin = marginSetting ? parseFloat(marginSetting.value) : 1.2; // 20% de lucro padrão
+      const margin = marginSetting ? parseFloat(marginSetting.value) : 1.2;
 
-      // =========================================================================
-      // ✅ CORREÇÃO 2: FILTRANDO PREÇOS NULOS E MAPEANDO NOMES DE SERVIÇOS
-      // Isso evita o erro 'NaN' e exibe nomes amigáveis para o usuário.
-      // =========================================================================
       const formattedServices = Object.entries(pricesFromApi[countryId])
         .filter(([_, details]) => details.cost !== null && !isNaN(details.cost) && details.count > 0)
         .map(([serviceCode, details]) => {
@@ -129,14 +116,52 @@ class SMSService {
    * @returns {Promise<Array>} - Dados estatísticos.
    */
   async getSmsUsageStats(userId, period = 'daily', days = 30) {
-    // ... (Esta função, que faltava antes, permanece como na correção anterior)
+    let groupByFormat;
+    let startDate = new Date();
+
+    if (period === 'daily') {
+      groupByFormat = "TO_CHAR(\"created_at\", 'DD/MM')";
+      startDate.setDate(startDate.getDate() - days);
+    } else if (period === 'monthly') {
+      groupByFormat = "TO_CHAR(\"created_at\", 'MM/YYYY')";
+      startDate.setMonth(startDate.getMonth() - 6);
+      startDate.setDate(1);
+    } else {
+      throw new Error('Período inválido. Use "daily" ou "monthly".');
+    }
+
+    const whereClause = {
+      user_id: userId,
+      created_at: { [Op.gte]: startDate },
+    };
+
+    const stats = await SmsMessage.findAll({
+      attributes: [
+        [literal(groupByFormat), 'date'],
+        [fn('COUNT', col('id')), 'total_sms'],
+        [fn('SUM', literal("CASE WHEN status = 'received' THEN 1 ELSE 0 END")), 'delivered_sms'],
+        [fn('SUM', literal("CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END")), 'failed_sms'],
+      ],
+      where: whereClause,
+      group: [literal(groupByFormat)],
+      order: [literal(groupByFormat)],
+      raw: true,
+    });
+    
+    return stats.map(item => ({
+      date: item.date,
+      total_sms: parseInt(item.total_sms || 0),
+      delivered_sms: parseInt(item.delivered_sms || 0),
+      failed_sms: parseInt(item.failed_sms || 0),
+    }));
   }
 
-  // O restante do arquivo (requestNumber, checkSmsStatus, etc.)
-  // Nenhuma outra alteração é necessária aqui. O código já está preparado para
-  // receber os dados corretos e usá-los no fluxo de ativação.
-  
-  // ... (Cole aqui o restante das funções do arquivo da resposta anterior, começando por `requestNumber`)
+  /**
+   * Solicita um número para recebimento de SMS OTP
+   * @param {string} userId - ID do usuário
+   * @param {Object} requestData - Dados da solicitação { service_code, country_code }
+   * @returns {Object} - Número ativo criado
+   */
   async requestNumber(userId, requestData) {
     const { service_code, country_code, operator = '' } = requestData;
     if (!service_code || country_code === undefined) { throw new Error("Código do serviço e do país são obrigatórios."); }
@@ -150,10 +175,11 @@ class SMSService {
     try {
       const numberData = await smsActiveAPI.getNumber(service_code, country_code, operator);
       const costPrice = await this.getCostPrice(country_code, service_code);
+      const countryName = await this.getCountryNameById(country_code);
 
       await CreditsService.debitCredits(userId, sellPrice, {
         type: 'sms_received',
-        description: `Ativação para ${serviceNamesMap[service_code] || service_code} (${(await this.getCountryNameById(country_code))})`,
+        description: `Ativação para ${serviceNamesMap[service_code] || service_code} (${countryName})`,
         metadata: { service_code, country_code, api_activation_id: numberData.id, phone_number: numberData.number, cost_price: costPrice, sell_price: sellPrice }
       });
 
@@ -183,12 +209,14 @@ class SMSService {
       throw new Error(`Erro ao solicitar número: ${error.message}`);
     }
   }
+
   async getSellPrice(countryCode, serviceCode) {
     const costPrice = await this.getCostPrice(countryCode, serviceCode);
     const marginSetting = await Setting.findByPk('SMS_PRICE_MARGIN');
     const margin = marginSetting ? parseFloat(marginSetting.value) : 1.2;
     return costPrice * margin;
   }
+
   async getCostPrice(countryCode, serviceCode) {
     const pricesFromApi = await smsActiveAPI.getPrices(countryCode, serviceCode);
     const serviceDetails = pricesFromApi?.[countryCode]?.[serviceCode];
@@ -197,6 +225,7 @@ class SMSService {
     }
     return parseFloat(serviceDetails.cost);
   }
+
   async getCountryNameById(countryId) {
     const countriesFromApi = await smsActiveAPI.getCountries();
     if(countriesFromApi[countryId] && countriesFromApi[countryId].eng) {
@@ -204,6 +233,7 @@ class SMSService {
     }
     return `País ${countryId}`;
   }
+
   async checkAndCancelIfNoMessage(activeNumberId) { try { const activeNumber = await ActiveNumber.findByPk(activeNumberId); if (!activeNumber || activeNumber.status !== 'active') { return; } if (!activeNumber.last_message_received_at) { await this.cancelNumber(activeNumber.user_id, activeNumberId, 'Cancelamento automático - tempo esgotado.'); } } catch (error) { console.error('Erro ao verificar cancelamento automático:', error); } }
   async checkSmsStatus(userId, activeNumberId) { const activeNumber = await ActiveNumber.findOne({ where: { id: activeNumberId, user_id: userId } }); if (!activeNumber) { throw new Error('Número ativo não encontrado'); } try { const status = await smsActiveAPI.getStatus(activeNumber.api_activation_id); if (status.status === 'completed' && status.code) { await this.processSmsReceived(activeNumber, status.code); } else if (status.status === 'cancelled') { await activeNumber.markAsCancelled(); } return { active_number: activeNumber, status: status.status, code: status.code, service_code: activeNumber.metadata.service_code }; } catch (error) { throw new Error(`Erro ao verificar status: ${error.message}`); } }
   async processSmsReceived(activeNumber, code) { if (activeNumber.status === 'completed') return; await activeNumber.updateLastMessageReceived(); await activeNumber.markAsCompleted(); const smsMessage = await SmsMessage.findOne({ where: { api_message_id: activeNumber.api_activation_id } }); if (smsMessage) { await smsMessage.update({ message_body: code, status: 'received' }); } await smsActiveAPI.completeActivation(activeNumber.api_activation_id); }
