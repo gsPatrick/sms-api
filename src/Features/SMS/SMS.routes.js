@@ -6,14 +6,7 @@
  */
 
 const express = require('express');
-
-// =========================================================================
-// ✅ CORREÇÃO APLICADA AQUI
-// Estava importando './Credits.controller' por engano.
-// O correto é importar o SMS.controller.
-// =========================================================================
 const SMSController = require('./SMS.controller');
-
 const { authenticate, authorize } = require('../../Utils/auth');
 const {
   validateSmsRequest,
@@ -26,17 +19,17 @@ const { body, query, param } = require('express-validator');
 const router = express.Router();
 
 // =========================================================================
-// ROTAS PARA A LÓGICA DE SERVIÇO -> PAÍS
+// ✅ ROTAS CORRIGIDAS PARA O FLUXO SERVIÇO -> PAÍS
 // =========================================================================
 
 /**
- * @route   GET /api/sms/get-all-services
- * @desc    Obtém a lista de todos os serviços disponíveis.
+ * @route   GET /api/sms/services-with-prices
+ * @desc    Obtém a lista de todos os serviços com seu preço inicial.
  * @access  Private
  */
-router.get('/get-all-services', 
+router.get('/services-with-prices', 
     authenticate, 
-    SMSController.getAllServices
+    SMSController.getServicesWithPrices
 );
 
 /**
@@ -199,7 +192,6 @@ router.get('/stats', [
 router.get('/all-history', [
   authenticate,
   authorize(['admin']),
-  // ... validações ...
 ], SMSController.getAllSmsHistory);
 
 module.exports = router;

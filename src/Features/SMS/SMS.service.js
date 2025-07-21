@@ -306,6 +306,98 @@ class SMSService {
       throw new Error(`Não foi possível obter os países para o serviço selecionado.`);
     }
   }
+
+ /**
+   * ✅ LÓGICA PRINCIPAL REFEITA
+   * Busca todos os preços da API, encontra o menor preço para cada serviço
+   * e retorna uma lista limpa para o frontend exibir.
+   * @returns {Promise<Array>} - Lista de serviços com seu preço inicial.
+   */
+  async getAllServicesWithStartingPrice() {
+    try {
+      const allPrices = await smsActiveAPI.getAllPrices();
+      if (typeof allPrices !== 'object' || allPrices === null) {
+        return [];
+      }
+
+      const services = {};
+      const margin = 1.2; // Sua margem de lucro de 20%
+
+      // Processa a resposta massiva da API
+      for (const countryId in allPrices) {
+        for (const serviceCode in allPrices[countryId]) {
+          const details = allPrices[countryId][serviceCode];
+          if (details && details.cost !== null && !isNaN(details.cost) && details.count > 0) {
+            const sellPrice = parseFloat(details.cost) * margin;
+
+            // Se o serviço ainda não foi visto, adicione-o
+            if (!services[serviceCode]) {
+              services[serviceCode] = {
+                code: serviceCode,
+                name: serviceNamesMap[serviceCode] || serviceCode,
+                startingPrice: sellPrice,
+              };
+            } else {
+              // Se já existe, verifica se este novo preço é menor
+              if (sellPrice < services[serviceCode].startingPrice) {
+                services[serviceCode].startingPrice = sellPrice;
+              }
+            }
+          }
+        }
+      }
+
+      // Converte o objeto em um array e ordena por nome
+      return Object.values(services).sort((a, b) => a.name.localeCompare(b.name));
+
+    } catch (error) {
+      console.error('Erro ao processar todos os preços de serviços:', error);
+      throw new Error('Não foi possível obter a lista de serviços com preços.');
+    }
+  }
+
+  /**
+   * Obtém a lista de países com preços para um serviço específico.
+   * Esta função agora é usada pelo MODAL.
+   * @param {string} serviceCode - O código do serviço (ex: 'wa').
+   * @returns {Promise<Array>} - Lista de países com preço e quantidade.
+   */
+  async getCountriesByService(serviceCode) {
+    try {
+      // Usaremos o getAllPrices para evitar outra chamada de rede se possível,
+      // mas para simplicidade, vamos manter a chamada específica.
+      const pricesFromApi = await smsActiveAPI.getPricesForService(serviceCode);
+      const allCountries = await smsActiveAPI.getCountries();
+
+      if (!pricesFromApi || !pricesFromApi[serviceCode]) {
+        return [];
+      }
+
+      const margin = 1.2;
+
+      const formattedCountries = Object.entries(pricesFromApi[serviceCode])
+        .filter(([_, details]) => details.cost !== null && !isNaN(details.cost) && details.count > 0)
+        .map(([countryId, details]) => {
+            const cost = parseFloat(details.cost);
+            const sellPrice = cost * margin;
+
+            return {
+                id: countryId,
+                name: allCountries[countryId] ? allCountries[countryId].eng : `País #${countryId}`,
+                cost: cost,
+                sellPrice: sellPrice.toFixed(2),
+                count: details.count,
+            };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      return formattedCountries;
+    } catch (error) {
+      console.error(`Erro ao buscar países para o serviço ${serviceCode}:`, error);
+      throw new Error(`Não foi possível obter os países para o serviço selecionado.`);
+    }
+  }
+
 }
 
 module.exports = new SMSService();

@@ -250,6 +250,19 @@ class SMSController {
     }
   }
 
+ async getServicesWithPrices(req, res) {
+    try {
+      const services = await SMSService.getAllServicesWithStartingPrice();
+      res.status(200).json({
+        success: true,
+        message: 'Serviços com preços obtidos com sucesso.',
+        data: services
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
 }
 
 module.exports = new SMSController();

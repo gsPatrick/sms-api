@@ -163,6 +163,17 @@ class SmsActiveAPI {
   async getPricesForService(service) {
     return this.makeRequest({ action: 'getPrices', service });
   }
+
+
+  // ✅ NOVA FUNÇÃO OTIMIZADA
+  /**
+   * Obtém a lista de TODOS os preços para TODOS os serviços.
+   * @returns {Promise<Object>} - Objeto massivo com todos os preços.
+   */
+  async getAllPrices() {
+    return this.makeRequest({ action: 'getPrices' });
+  }
+
 }
 
 
