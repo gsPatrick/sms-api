@@ -3,6 +3,7 @@
  * 
  * Contém a lógica de negócio para gerenciamento de SMS.
  * Compatível com a API V1 (handler_api.php) do SMS-Activate.
+ * Otimizado com um cache em memória para minimizar chamadas à API externa.
  */
 
 const { SmsMessage, ActiveNumber, User, Setting } = require('../../models');
@@ -10,110 +11,136 @@ const smsActiveAPI = require('../../Utils/smsActive');
 const CreditsService = require('../Credits/Credits.service');
 const { Op, fn, col, literal } = require('sequelize');
 
-// =========================================================================
-// ✅ MAPA DE NOMES DE SERVIÇOS MASSIVAMENTE EXPANDIDO
-// Usando os dados do seu services.json para garantir a tradução correta dos nomes.
-// =========================================================================
+// Mapeamento de nomes de serviços para uma exibição amigável
 const serviceNamesMap = {
-    "ig": "Instagram+Threads", "go": "Google,youtube,Gmail", "fb": "facebook", "wa": "Whatsapp", "tg": "Telegram",
-    "am": "Amazon", "mm": "Microsoft", "hw": "Alipay/Alibaba/1688", "ds": "Discord", "yw": "Grindr",
-    "oi": "Tinder", "vi": "Viber", "mb": "Yahoo", "lf": "TikTok/Douyin", "tw": "Twitter", "wb": "WeChat",
-    "ni": "Gojek", "ka": "Shopee", "fk": "BLIBLI", "ew": "Nike", "ot": "Any other", "vk": "vk.com",
-    "nv": "Naver", "li": "Baidu", "jg": "Grab", "ev": "Picpay", "ub": "Uber", "sg": "OZON", "ue": "Onet",
-    "vz": "Hinge", "xh": "OVO", "jr": "Samokat", "bw": "Signal", "nz": "Foodpanda", "da": "MTS CashBack",
-    "ts": "PayPal", "uu": "Wildberries", "wx": "Apple", "ju": "Indomaret", "tn": "LinkedIN", "pm": "AOL",
-    "fr": "Dana", "mg": "Magnit", "me": "Line messenger", "ok": "ok.ru", "qf": "RedBook", "aez": "Shein",
-    "ya": "Yandex/Uber", "dl": "Lazada", "ki": "99app", "cn": "Fiverr", "pf": "pof.com",
-    "pc": "Casino/bet/gambling", "dh": "eBay", "sn": "OLX", "xd": "Tokopedia", "nf": "Netflix",
-    "kc": "Vinted", "gp": "Ticketmaster", "aaa": "Nubank", "ve": "Dream11", "rr": "Wolt", "bnl": "Reddit",
-    "ua": "BlaBlaCar", "fd": "Mamba", "qq": "Tencent QQ", "kf": "Weibo", "yl": "Yalla", "tm": "Akulaku",
-    "ep": "Temu", "im": "Imo", "bz": "Blizzard", "do": "Leboncoin", "aor": "OKX", "zk": "Deliveroo",
-    "tl": "Truecaller", "abn": "Bybit", "cq": "Mercado", "mo": "Bumble", "gf": "GoogleVoice",
-    "fv": "Vidio", "tx": "Bolt", "fu": "Snapchat", "wr": "Walmart", "pd": "IFood", "wh": "TanTan",
-    "ly": "Olacabs", "ft": "Bookmakers", "agl": "Betano", "ac": "DoorDash", "afz": "Klarna",
-    "hx": "AliExpress", "aff": "C6 Bank", "aq": "Glovo", "mt": "Steam", "df": "Happn", "ma": "Mail.ru",
-    "rl": "inDriver", "gq": "Freelancer", "bl": "BIGO LIVE", "qv": "Badoo", "uk": "Airbnb", "aba": "Rappi",
-    "ij": "Revolut", "dr": "OpenAI", "abg": "PagBank", "hb": "Twitch", "bc": "GCash", "ls": "Careem",
-    "vg": "ShellBox", "ie": "bet365", "ta": "Wink", "tu": "Lyft", "tr": "Paysend", "xt": "Flipkart",
-    "alo": "Profee", "ov": "Beget", "hc": "MOMO", "gr": "Astropay", "ms": "NovaPoshta", "ank": "Garena",
-    "hp": "Meesho", "gt": "Gett", "ng": "FunPay", "sr": "Starbucks", "gj": "Carousell", "xr": "Tango",
-    "aon": "Binance", "fh": "Lalamove", "ns": "Oldubil", "sh": "Vkusvill", "zh": "Zoho",
-    "je": "Nanovest", "afe": "GovBr"
+  "ig": "Instagram+Threads", "go": "Google, Youtube, Gmail", "fb": "Facebook", "wa": "Whatsapp", "tg": "Telegram",
+  "am": "Amazon", "mm": "Microsoft", "hw": "Alipay/Alibaba/1688", "ds": "Discord", "yw": "Grindr",
+  "oi": "Tinder", "vi": "Viber", "mb": "Yahoo", "lf": "TikTok/Douyin", "tw": "Twitter", "wb": "WeChat",
+  "ni": "Gojek", "ka": "Shopee", "fk": "BLIBLI", "ew": "Nike", "ot": "Outro Serviço", "vk": "vk.com",
+  "nv": "Naver", "li": "Baidu", "jg": "Grab", "ev": "Picpay", "ub": "Uber", "sg": "OZON", "ue": "Onet",
+  "vz": "Hinge", "xh": "OVO", "jr": "Samokat", "bw": "Signal", "nz": "Foodpanda", "da": "MTS CashBack",
+  "ts": "PayPal", "uu": "Wildberries", "wx": "Apple", "ju": "Indomaret", "tn": "LinkedIN", "pm": "AOL",
+  "fr": "Dana", "mg": "Magnit", "me": "Line messenger", "ok": "ok.ru", "qf": "RedBook", "aez": "Shein",
+  "ya": "Yandex/Uber", "dl": "Lazada", "ki": "99app", "cn": "Fiverr", "pf": "pof.com",
+  "pc": "Casino/bet/gambling", "dh": "eBay", "sn": "OLX", "xd": "Tokopedia", "nf": "Netflix",
+  "kc": "Vinted", "gp": "Ticketmaster", "aaa": "Nubank", "ve": "Dream11", "rr": "Wolt", "bnl": "Reddit",
+  "ua": "BlaBlaCar", "fd": "Mamba", "qq": "Tencent QQ", "kf": "Weibo", "yl": "Yalla", "tm": "Akulaku",
+  "ep": "Temu", "im": "Imo", "bz": "Blizzard", "do": "Leboncoin", "aor": "OKX", "zk": "Deliveroo",
+  "tl": "Truecaller", "abn": "Bybit", "cq": "Mercado", "mo": "Bumble", "gf": "GoogleVoice",
+  "fv": "Vidio", "tx": "Bolt", "fu": "Snapchat", "wr": "Walmart", "pd": "iFood", "wh": "TanTan",
+  "ly": "Olacabs", "ft": "Bookmakers", "agl": "Betano", "ac": "DoorDash", "afz": "Klarna",
+  "hx": "AliExpress", "aff": "C6 Bank", "aq": "Glovo", "mt": "Steam", "df": "Happn", "ma": "Mail.ru",
+  "rl": "inDriver", "gq": "Freelancer", "bl": "BIGO LIVE", "qv": "Badoo", "uk": "Airbnb", "aba": "Rappi",
+  "ij": "Revolut", "dr": "OpenAI", "abg": "PagBank", "hb": "Twitch", "bc": "GCash", "ls": "Careem",
+  "vg": "ShellBox", "ie": "bet365", "ta": "Wink", "tu": "Lyft", "tr": "Paysend", "xt": "Flipkart",
+  "alo": "Profee", "ov": "Beget", "hc": "MOMO", "gr": "Astropay", "ms": "NovaPoshta", "ank": "Garena",
+  "hp": "Meesho", "gt": "Gett", "ng": "FunPay", "sr": "Starbucks", "gj": "Carousell", "xr": "Tango",
+  "aon": "Binance", "fh": "Lalamove", "ns": "Oldubil", "sh": "Vkusvill", "zh": "Zoho",
+  "je": "Nanovest", "afe": "Gov.br"
 };
+
+// Cache simples em memória para armazenar os dados da API
+let pricesCache = null;
+let countriesCache = null;
+let cacheTimestamp = null;
+
+// Função auxiliar para garantir que o cache está atualizado
+async function ensureCache() {
+    const CACHE_DURATION_MS = 10 * 60 * 1000; // Cache de 10 minutos
+    if (!pricesCache || !countriesCache || (new Date() - cacheTimestamp > CACHE_DURATION_MS)) {
+        console.log('Atualizando cache de preços e países da API...');
+        [pricesCache, countriesCache] = await Promise.all([
+            smsActiveAPI.getAllPrices(),
+            smsActiveAPI.getCountries()
+        ]);
+        cacheTimestamp = new Date();
+    }
+}
 
 class SMSService {
   
   /**
-   * Obtém a lista de países disponíveis, processando a resposta correta da API V1.
-   * @returns {Promise<Array>} - Lista de países formatada e ordenada.
+   * Obtém a lista de todos os serviços com seu preço inicial.
+   * Utiliza um cache para evitar chamadas repetidas à API.
+   * @returns {Promise<Array>} - Lista de serviços formatada.
    */
-  async getAvailableCountries() {
+  async getAllServicesWithStartingPrice() {
     try {
-      const countriesFromApi = await smsActiveAPI.getCountries();
-      
-      if (typeof countriesFromApi !== 'object' || countriesFromApi === null) {
-          throw new Error('Formato de resposta inesperado da API de países.');
+      await ensureCache();
+      const allPrices = pricesCache;
+
+      if (typeof allPrices !== 'object' || allPrices === null) return [];
+
+      const services = {};
+      const marginSetting = await Setting.findByPk('SMS_PRICE_MARGIN');
+      const margin = marginSetting ? parseFloat(marginSetting.value) : 1.2;
+
+      for (const countryId in allPrices) {
+        for (const serviceCode in allPrices[countryId]) {
+          const details = allPrices[countryId][serviceCode];
+          if (details && details.cost !== null && !isNaN(details.cost) && details.count > 0) {
+            const sellPrice = parseFloat(details.cost) * margin;
+
+            if (!services[serviceCode] || sellPrice < services[serviceCode].startingPrice) {
+              services[serviceCode] = {
+                code: serviceCode,
+                name: serviceNamesMap[serviceCode] || serviceCode,
+                startingPrice: sellPrice,
+              };
+            }
+          }
+        }
       }
-
-      const formattedCountries = Object.values(countriesFromApi)
-        .filter(country => country && country.visible === 1)
-        .map(country => ({
-            id: country.id.toString(),
-            name: country.eng,
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name));
-
-      return formattedCountries;
+      return Object.values(services).sort((a, b) => a.name.localeCompare(b.name));
     } catch (error) {
-      console.error('Erro ao buscar e processar países da API externa:', error);
-      throw new Error('Não foi possível obter a lista de países.');
+      console.error('Erro ao processar todos os preços de serviços:', error);
+      throw new Error('Não foi possível obter a lista de serviços com preços.');
     }
   }
 
   /**
-   * Obtém a lista de serviços com preços para um país específico.
-   * @param {string} countryId - O ID do país.
-   * @returns {Promise<Array>} - Lista de serviços com preço e quantidade.
+   * Filtra os dados do cache para obter a lista de países com preços para um serviço específico.
+   * @param {string} serviceCode - O código do serviço.
+   * @returns {Promise<Array>} - Lista de países para o serviço.
    */
-  async getServicesByCountry(countryId) {
+  async getCountriesByService(serviceCode) {
     try {
-      const pricesFromApi = await smsActiveAPI.getPrices(countryId);
+      await ensureCache();
+      const allPrices = pricesCache;
+      const allCountries = countriesCache;
 
-      if (!pricesFromApi[countryId]) {
-        return [];
-      }
+      if (!allPrices || !allCountries) throw new Error("Cache de dados não disponível.");
 
+      const countriesForService = [];
       const marginSetting = await Setting.findByPk('SMS_PRICE_MARGIN');
       const margin = marginSetting ? parseFloat(marginSetting.value) : 1.2;
 
-      const formattedServices = Object.entries(pricesFromApi[countryId])
-        .filter(([_, details]) => details.cost !== null && !isNaN(details.cost) && details.count > 0)
-        .map(([serviceCode, details]) => {
+      for (const countryId in allPrices) {
+        if (allCountries[countryId] && allPrices[countryId][serviceCode]) {
+          const details = allPrices[countryId][serviceCode];
+          if (details && details.cost !== null && !isNaN(details.cost) && details.count > 0 && allCountries[countryId].visible === 1) {
             const cost = parseFloat(details.cost);
             const sellPrice = cost * margin;
+            countriesForService.push({
+              id: countryId,
+              name: allCountries[countryId].eng,
+              cost: cost,
+              sellPrice: sellPrice.toFixed(2),
+              count: details.count,
+            });
+          }
+        }
+      }
 
-            return {
-                code: serviceCode,
-                name: serviceNamesMap[serviceCode] || serviceCode, // Usa o mapa de nomes
-                cost: cost,
-                sellPrice: sellPrice.toFixed(2),
-                count: details.count,
-            };
-        });
-
-      return formattedServices;
+      return countriesForService.sort((a, b) => a.name.localeCompare(b.name));
     } catch (error) {
-      console.error(`Erro ao buscar serviços para o país ${countryId}:`, error);
-      throw new Error(`Não foi possível obter os serviços para o país selecionado.`);
+      console.error(`Erro ao buscar países para o serviço ${serviceCode}:`, error);
+      throw new Error(`Não foi possível obter os países para o serviço selecionado.`);
     }
   }
   
   /**
    * Obtém estatísticas de uso de SMS para o usuário.
-   * @param {string} userId - ID do usuário.
-   * @param {string} period - 'daily' ou 'monthly'.
-   * @param {number} days - Número de dias para o período.
-   * @returns {Promise<Array>} - Dados estatísticos.
    */
   async getSmsUsageStats(userId, period = 'daily', days = 30) {
     let groupByFormat;
@@ -158,9 +185,6 @@ class SMSService {
 
   /**
    * Solicita um número para recebimento de SMS OTP
-   * @param {string} userId - ID do usuário
-   * @param {Object} requestData - Dados da solicitação { service_code, country_code }
-   * @returns {Object} - Número ativo criado
    */
   async requestNumber(userId, requestData) {
     const { service_code, country_code, operator = '' } = requestData;
@@ -218,8 +242,8 @@ class SMSService {
   }
 
   async getCostPrice(countryCode, serviceCode) {
-    const pricesFromApi = await smsActiveAPI.getPrices(countryCode, serviceCode);
-    const serviceDetails = pricesFromApi?.[countryCode]?.[serviceCode];
+    await ensureCache();
+    const serviceDetails = pricesCache?.[countryCode]?.[serviceCode];
     if (!serviceDetails || serviceDetails.cost === null || isNaN(parseFloat(serviceDetails.cost))) {
         throw new Error('Preço para o serviço não encontrado ou inválido.');
     }
@@ -227,9 +251,9 @@ class SMSService {
   }
 
   async getCountryNameById(countryId) {
-    const countriesFromApi = await smsActiveAPI.getCountries();
-    if(countriesFromApi[countryId] && countriesFromApi[countryId].eng) {
-        return countriesFromApi[countryId].eng;
+    await ensureCache();
+    if(countriesCache[countryId] && countriesCache[countryId].eng) {
+        return countriesCache[countryId].eng;
     }
     return `País ${countryId}`;
   }
@@ -241,163 +265,6 @@ class SMSService {
   async cancelNumber(userId, activeNumberId, reason = 'Cancelado pelo usuário') { const activeNumber = await ActiveNumber.findOne({ where: { id: activeNumberId, user_id: userId }}); if (!activeNumber) throw new Error('Número ativo não encontrado'); if (activeNumber.status === 'cancelled') throw new Error('Número já foi cancelado'); try { await smsActiveAPI.cancelActivation(activeNumber.api_activation_id); await activeNumber.markAsCancelled(); const smsMessage = await SmsMessage.findOne({ where: { api_message_id: activeNumber.api_activation_id } }); if (smsMessage) { await smsMessage.markAsCancelled(); } return activeNumber; } catch (error) { throw new Error(`Erro ao cancelar número: ${error.message}`); } }
   async getSmsHistory(userId, options = {}) { const { page = 1, limit = 20, status, service_code, startDate, endDate } = options; const offset = (page - 1) * limit; const where = { user_id: userId }; if (status) { where.status = status; } if (service_code) { where.service_code = service_code; } if (startDate || endDate) { where.created_at = {}; if (startDate) { where.created_at[Op.gte] = new Date(startDate); } if (endDate) { where.created_at[Op.lte] = new Date(endDate); } } const { count, rows } = await SmsMessage.findAndCountAll({ where, order: [['created_at', 'DESC']], limit: parseInt(limit), offset: parseInt(offset), include: [{ model: User, as: 'user', attributes: ['id', 'username', 'email'] }] }); return { messages: rows, pagination: { current_page: parseInt(page), total_pages: Math.ceil(count / limit), total_items: count, items_per_page: parseInt(limit) } }; }
   async getActiveNumbers(userId) { return ActiveNumber.findAll({ where: { user_id: userId, status: 'active' }, order: [['created_at', 'DESC']] }); }
-
-    // =========================================================================
-  // ✅ NOVOS MÉTODOS DE SERVIÇO PARA O FLUXO SERVIÇO -> PAÍS
-  // =========================================================================
-
-  /**
-   * Obtém a lista de todos os serviços disponíveis na API Externa.
-   * @returns {Promise<Array>} - Lista de serviços formatada.
-   */
-  async getAllAvailableServices() {
-    try {
-      // Esta é uma nova função que precisaremos adicionar ao nosso smsActive.js
-      const servicesFromApi = await smsActiveAPI.getServicesList();
-      
-      const formattedServices = servicesFromApi.map(service => ({
-        code: service.code,
-        name: serviceNamesMap[service.code] || service.name, // Usa nosso mapa ou o nome da API
-      })).sort((a, b) => a.name.localeCompare(b.name));
-
-      return formattedServices;
-    } catch (error) {
-      console.error('Erro ao buscar lista de serviços da API externa:', error);
-      throw new Error('Não foi possível obter a lista de serviços.');
-    }
-  }
-
-  /**
-   * Obtém a lista de países com preços para um serviço específico.
-   * @param {string} serviceCode - O código do serviço (ex: 'wa').
-   * @returns {Promise<Array>} - Lista de países com preço e quantidade.
-   */
-  async getCountriesByService(serviceCode) {
-    try {
-      const pricesFromApi = await smsActiveAPI.getPricesForService(serviceCode);
-      const allCountries = await smsActiveAPI.getCountries();
-
-      if (!pricesFromApi[serviceCode]) {
-        return []; // Nenhum país disponível para este serviço
-      }
-
-      const marginSetting = await Setting.findByPk('SMS_PRICE_MARGIN');
-      const margin = marginSetting ? parseFloat(marginSetting.value) : 1.2;
-
-      const formattedCountries = Object.entries(pricesFromApi[serviceCode])
-        .filter(([_, details]) => details.cost !== null && !isNaN(details.cost) && details.count > 0)
-        .map(([countryId, details]) => {
-            const cost = parseFloat(details.cost);
-            const sellPrice = cost * margin;
-
-            return {
-                id: countryId,
-                name: allCountries[countryId] ? allCountries[countryId].eng : `País #${countryId}`,
-                cost: cost,
-                sellPrice: sellPrice.toFixed(2),
-                count: details.count,
-            };
-        })
-        .sort((a, b) => a.name.localeCompare(b.name));
-
-      return formattedCountries;
-    } catch (error) {
-      console.error(`Erro ao buscar países para o serviço ${serviceCode}:`, error);
-      throw new Error(`Não foi possível obter os países para o serviço selecionado.`);
-    }
-  }
-
- /**
-   * ✅ LÓGICA PRINCIPAL REFEITA
-   * Busca todos os preços da API, encontra o menor preço para cada serviço
-   * e retorna uma lista limpa para o frontend exibir.
-   * @returns {Promise<Array>} - Lista de serviços com seu preço inicial.
-   */
-  async getAllServicesWithStartingPrice() {
-    try {
-      const allPrices = await smsActiveAPI.getAllPrices();
-      if (typeof allPrices !== 'object' || allPrices === null) {
-        return [];
-      }
-
-      const services = {};
-      const margin = 1.2; // Sua margem de lucro de 20%
-
-      // Processa a resposta massiva da API
-      for (const countryId in allPrices) {
-        for (const serviceCode in allPrices[countryId]) {
-          const details = allPrices[countryId][serviceCode];
-          if (details && details.cost !== null && !isNaN(details.cost) && details.count > 0) {
-            const sellPrice = parseFloat(details.cost) * margin;
-
-            // Se o serviço ainda não foi visto, adicione-o
-            if (!services[serviceCode]) {
-              services[serviceCode] = {
-                code: serviceCode,
-                name: serviceNamesMap[serviceCode] || serviceCode,
-                startingPrice: sellPrice,
-              };
-            } else {
-              // Se já existe, verifica se este novo preço é menor
-              if (sellPrice < services[serviceCode].startingPrice) {
-                services[serviceCode].startingPrice = sellPrice;
-              }
-            }
-          }
-        }
-      }
-
-      // Converte o objeto em um array e ordena por nome
-      return Object.values(services).sort((a, b) => a.name.localeCompare(b.name));
-
-    } catch (error) {
-      console.error('Erro ao processar todos os preços de serviços:', error);
-      throw new Error('Não foi possível obter a lista de serviços com preços.');
-    }
-  }
-
-  /**
-   * Obtém a lista de países com preços para um serviço específico.
-   * Esta função agora é usada pelo MODAL.
-   * @param {string} serviceCode - O código do serviço (ex: 'wa').
-   * @returns {Promise<Array>} - Lista de países com preço e quantidade.
-   */
-  async getCountriesByService(serviceCode) {
-    try {
-      // Usaremos o getAllPrices para evitar outra chamada de rede se possível,
-      // mas para simplicidade, vamos manter a chamada específica.
-      const pricesFromApi = await smsActiveAPI.getPricesForService(serviceCode);
-      const allCountries = await smsActiveAPI.getCountries();
-
-      if (!pricesFromApi || !pricesFromApi[serviceCode]) {
-        return [];
-      }
-
-      const margin = 1.2;
-
-      const formattedCountries = Object.entries(pricesFromApi[serviceCode])
-        .filter(([_, details]) => details.cost !== null && !isNaN(details.cost) && details.count > 0)
-        .map(([countryId, details]) => {
-            const cost = parseFloat(details.cost);
-            const sellPrice = cost * margin;
-
-            return {
-                id: countryId,
-                name: allCountries[countryId] ? allCountries[countryId].eng : `País #${countryId}`,
-                cost: cost,
-                sellPrice: sellPrice.toFixed(2),
-                count: details.count,
-            };
-        })
-        .sort((a, b) => a.name.localeCompare(b.name));
-
-      return formattedCountries;
-    } catch (error) {
-      console.error(`Erro ao buscar países para o serviço ${serviceCode}:`, error);
-      throw new Error(`Não foi possível obter os países para o serviço selecionado.`);
-    }
-  }
-
 }
 
 module.exports = new SMSService();
