@@ -6,7 +6,8 @@
  * Otimizado com um cache em memória para minimizar chamadas à API externa.
  */
 
-const { SmsMessage, ActiveNumber, User, Setting } = require('../../models');
+// ALTERADO: Adicionado SmsService à importação de modelos
+const { SmsMessage, ActiveNumber, User, Setting, SmsService } = require('../../models');
 const smsActiveAPI = require('../../Utils/smsActive');
 const CreditsService = require('../Credits/Credits.service');
 const { Op, fn, col, literal } = require('sequelize');
@@ -58,6 +59,26 @@ async function ensureCache() {
 }
 
 class SMSService {
+
+  /**
+   * NOVO: Busca um serviço pelo código ou cria um novo se não existir.
+   * Isso garante a sincronização sob demanda dos serviços no banco de dados local.
+   * @param {string} serviceCode - O código do serviço (ex: 'wa', 'ya').
+   * @returns {Promise<SmsService>} - A instância do modelo do serviço.
+   */
+  async findOrCreateSmsService(serviceCode) {
+    const [service] = await SmsService.findOrCreate({
+      where: { code: serviceCode },
+      defaults: {
+        code: serviceCode,
+        name: serviceNamesMap[serviceCode] || `Serviço ${serviceCode}`, // Nome amigável ou fallback
+        price_per_otp: 0.01, // Preço padrão, já que o real varia por país
+        description: 'Serviço adicionado automaticamente pelo sistema.',
+        active: true,
+      }
+    });
+    return service;
+  }
   
   /**
    * Obtém a lista de todos os serviços com seu preço inicial.
@@ -195,6 +216,12 @@ class SMSService {
     const user = await User.findByPk(userId);
     if (!user) throw new Error('Usuário não encontrado');
     if (parseFloat(user.credits) < sellPrice) { throw new Error('Créditos insuficientes para realizar esta operação.'); }
+    
+    // ALTERADO: Busca ou cria o serviço antes de prosseguir
+    const localService = await this.findOrCreateSmsService(service_code);
+    if (!localService) {
+      throw new Error(`Não foi possível encontrar ou criar o serviço local para o código: ${service_code}`);
+    }
 
     try {
       const numberData = await smsActiveAPI.getNumber(service_code, country_code, operator);
@@ -207,9 +234,10 @@ class SMSService {
         metadata: { service_code, country_code, api_activation_id: numberData.id, phone_number: numberData.number, cost_price: costPrice, sell_price: sellPrice }
       });
 
+      // ALTERADO: Passa o ID do serviço local para a criação do ActiveNumber
       const activeNumber = await ActiveNumber.create({
         user_id: userId,
-        sms_service_id: null,
+        sms_service_id: localService.id, // Correção aplicada aqui
         phone_number: numberData.number,
         api_activation_id: numberData.id,
         country_code,
@@ -230,6 +258,9 @@ class SMSService {
       return { active_number: activeNumber };
 
     } catch (error) {
+      // Reverte os créditos em caso de falha na API SMS-Activate após o débito
+      // (Esta parte é opcional, mas uma boa prática)
+      // await CreditsService.addCredits(userId, sellPrice, ...);
       throw new Error(`Erro ao solicitar número: ${error.message}`);
     }
   }
